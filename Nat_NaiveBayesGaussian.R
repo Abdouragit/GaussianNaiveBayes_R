@@ -201,7 +201,7 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     
                                   ## Méthode de prédiction ##
                                   
-                                  predict = function(newdata, type = "class", threshold = 0.001, eps = 0) {
+                                  predict = function(newdata,threshold = 0.001, eps = 0) {
                                     #on vérifie que les données d'entrée 'newdata' ont été fournies:
                                     if (is.null(newdata))
                                       stop("predict.gaussian_naive_bayes(): newdata is required.", call. = FALSE)
@@ -232,22 +232,8 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     if (n_features == 0) {
                                       warning(paste0("predict.gaussian_naive_bayes(): no feature in newdata corresponds to ",
                                                      "features defined in the object. Classification is based on prior probabilities."), call. = FALSE)
-                                      if (type == "class") {
-                                        return(factor(rep(lev[which.max(prior)], n_obs), levels = lev))
-                                      } else {
-                                        return(matrix(prior, ncol = n_lev, nrow = n_obs, byrow = TRUE, dimnames = list(NULL, lev)))
-                                      }
-                                    }
-                                    
-                                    if (n_features < n_tables) {
-                                      warning(paste0("predict.gaussian_naive_bayes(): only ", n_features, " feature(s) in newdata could be matched ",
-                                                     "with ", n_tables, " feature(s) defined in the object."), call. = FALSE)
-                                    }
-                                    if (n_features_newdata > n_features) {
-                                      warning(paste0("predict.gaussian_naive_bayes(): newdata contains feature(s) that could not be matched ",
-                                                     "with (", n_features, ") feature(s) defined in the object. Only matching features are used for calculation."), call. = FALSE)
-                                      newdata <- newdata[, features, drop = FALSE]
-                                    }
+                                      return(factor(rep(lev[which.max(prior)], nrow = newdata)), levels = lev)
+                                    } 
                                     
                                     # Si des données manquantes sont présentes dans newdata, elles sont identifiées. Les valeurs manquantes sont remplies de zéros dans le calcul des probabilités, et un avertissement est affiché pour informer de la présence de données manquantes:
                                     NAx <- anyNA(newdata)
@@ -263,9 +249,9 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     eps <- ifelse(eps == 0, log(.Machine$double.xmin), log(eps))
                                     threshold <- log(threshold)
                                     
-                                    #Calcul des probabilités :Les probabilités pour chaque classe sont calculées à partir des caractéristiques de newdata en utilisant la densité gaussienne.Les probabilités sont calculées pour chaque classe et stockées dans la matrice post:
+                                    #Calcul des probabilités :Les probabilités pour chaque classe sont calculées à partir des caractéristiques de newdata en utilisant la densité gaussienne et sont stockées dans la matrice post:
                 
-                                    post <- matrix(nrow = n_obs, ncol = n_lev)
+                                    post <- matrix(nrow = nrow(newdata), ncol = length(lev))
                                     for (ith_class in seq_along(lev)) {
                                       ith_class_sd <- sd[ith_class, ]
                                       ith_post <- -0.5 * log(2 * pi * ith_class_sd^2) - 0.5 * ((newdata - mu[ith_class, ]) / ith_class_sd)^2
@@ -273,51 +259,51 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                       ith_post[ith_post <= eps] <- threshold
                                       post[, ith_class] <- if (use_Matrix) Matrix::colSums(ith_post) + log(prior[ith_class]) else colSums(ith_post) + log(prior[ith_class])
                                     }
-                                    
-                                    #Classification ou probabilités :Selon le paramètre type, la fonction peut renvoyer les classes prédites ou les probabilités associées.Si type est "class", la classe prédite est renvoyée. Si une seule observation est fournie, la classe la plus probable est renvoyée.Si type est "prob", les probabilités sont renvoyées. Pour une seule observation, les probabilités sont normalisées pour former une distribution de probabilité sur les classes:
-                                    
-                                    if (type == "class") {
-                                      if (n_obs == 1) {
-                                        return(factor(lev[which.max(post)], levels = lev))
-                                      } else {
-                                        return(factor(lev[max.col(post, "first")], levels = lev))
+                                    #Renvoie des classes prédites:
+                                    return(factor(lev[max.col(post, "first")], levels =lev))
                                       }
-                                    }
-                                    else {
-                                      if (n_obs == 1) {
-                                        post <- t(as.matrix(apply(post, 2, function(x) { 1 / sum(exp(post - x)) })))
-                                        colnames(post) <- lev
-                                        return(post)
-                                      }
-                                      else {
-                                        colnames(post) <- lev
-                                        return(apply(post, 2, function(x) { 1 / if (use_Matrix) Matrix::rowSums(exp(post - x)) else rowSums(exp(post - x)) }))
-                                      }
-                                    }
+                                  }
                                     
                                  ## Méthode predict_proba ##
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                  
-                                      
-                                    }, #fin de la fonction "predict.proba"
-                            
-                                  
+                                # Renvoies les probabilités d'appartenance aux classes pour chaque individus
                                   predict_proba = function(X) {
-                                      # Code pour renvoyer les probabilités
-                                      # ...
-                                    }
+                                    n_obs <- nrow(X)
+                                    n_lev <- length(private$levels)
+                                    post <- matrix(0, nrow = n_obs, ncol = n_lev)
+                                    
+                                    #Si il y a une seule observation dans les nouvelles données "X", le résultat sera une matrice de probabilités pour cette observation:
+                                    if (n_obs == 1) { 
+                                      # si il y a une seule observation, le résultat est transposé 't'pour avoir une sortie plus lisible:
+                                      #les colonnes sont nommées avec les niveaux de classe 'lev'
+                                      #fonction 'apply' applique une fonction sur chaque colonne ('2') de la matrice 'post'
+                                      #la fonction calcul les probabilités pour chaque classe
+                                      post <- t(as.matrix(apply(post, 2, function(x) 1 / sum(exp(post - x)))))
+                                      colnames(post) <- private$levels
+                                      return(post)
+                                    #Si il y a plusieurs observations (n>1) dans les données "newdata", le calcul des probabilités est appliqué à toutes les observations: 
+                                    } else {
+                                      colnames(post) <- private$levels
+                                      result <- matrix(0, nrow = n_obs, ncol = n_lev)
+                                      
+                                        #Boucles pour calculer la somme des valeurs de chaque ligne de la matrice 'probabilities' et les stocker dans le vecteur 'sum_per_row': 
+                                      for (i in seq_len(n_obs)) {
+                                        probabilities <- exp(post[i, ] - post[i, ])
+                                        sum_per_row <- sum(probabilities)
+                                        
+                                        for (j in seq_along(private$levels)) {
+                                            results[i, j] <- probabilities[j] / sum_per_row
+                                        }
+                                      }
+                      
+                                        #Si on est dans le cas où il y a une seule observation: on ajoute des noms de colonne à la matrice 'result'. Dans tout les cas, on renvoie la matrice normalisée des probabilités. 
+                                        if (n_obs ==1) {
+                                          dimnames(result) <- list(NULL, private$levels)
+                                          return(result)
+                                      } else {
+                                          return(result)
+                                      }
+                                  }
+                            
                                 
                                
                                private = list(
