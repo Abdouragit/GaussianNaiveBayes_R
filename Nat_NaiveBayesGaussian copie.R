@@ -11,51 +11,20 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     private$prior <- NULL
                                     private$call <- NULL
                                   },
-                                  # Ajouter une fonction qui permet de transformer les données: conserver les variables quantitatives numeric et integer.
+                                  # Ajouter la fonction qui permet de binariser les variables qualitatives. 
                                   
-                                  
-                                  
-                                  # Fonction qui permet la standardisation des données si les données n'ont pas les mêmes unités (cela deviendra un paramètre que l'utilisateur pourra activer ou non):
-                                  
-                                  centrage_reduction = function(X) { # X:dataframe qu'on veut centrer et réduire
-                                    instance <- list() #instance est un objet crée pour stocker les résultats de la fonction
-                                    archive.ect_mean <- function(x) {
-                                      n<-length(x)
-                                      moy<-mean(x)
-                                      ect <- sqrt((n-1)/n*var(x)) # var provient du package stat? Coder ce var 
-                                      return(c(moy,ect))
+                                  binarize <- function(column) {
+                                    if (is.numeric(column)) {
+                                      return(column)
+                                    } else if (is.factor(column) || is.character(column)) {
+                                      unique_values <- unique(column)
+                                      binary_columns <- lapply(unique_values, function(value) ifelse(column == value, 1, 0))
+                                      names(binary_columns) <- paste0(names(column), "_", unique_values)
+                                      return(as.data.frame(binary_columns))
+                                    } else {
+                                      stop("Only character, factor, or numerical columns must be entered.")
                                     }
-                                    one.cr  = function(x) {
-                                      n<-length(x)
-                                      moy<-mean(x)
-                                      ect <- sqrt((n-1)/n*var(x))
-                                      y<- (x-moy)/ect # on centre et réduit les valeurs les valeurs du vecteur x. 
-                                      return(y) # y est le vecteur centré et réduit de x
-                                    }
-                                    Y <- as.data.frame(lapply(X, one.cr))# on applique la fonction one.cr à chaque colonne du dataframe X, cela crée un dataframe Y où chaque colonne est centrée et réduite. 
-                                    Arch <- as.data.frame(lapply(X, archive.ect_mean)) #cela crée un nouveau dataframe Arch où chaque colonne contient la moyenne et l'écart-type originaux
-                                    
-                                    #Les data frames Y et Arch sont assignés à l'objet "instance" en tant que membres "Y" et "Arch" pour stocker les résultats de la fonction: en devenant des membres de "instance", on pourra accéder facilement aux résultats de Y(données centrées et réduites) et au moyenne et écart type originaux (dans "Arch"). Y et Arch deviennent des attributs de l'objet "instance". 
-                                    instance$Y <- Y
-                                    instance$Arch <- Arch
-                                    class(instance) <- "Scale" # la classe de l'objet "instance"est définie comme "Scale", utile pour identifier que cet objet est lié au centrage réduction des données.
-                                    return(instance) #objet instance renvoyé en sortie de fonction, contient les données centrées et réduites et les moyennes et écart-type originaux. 
                                   }
-                                  
-                                  #centrage reduction de X (test set dataframe)
-                                  #archive_moy_ect list contient la moyenne et ecart type de chaque colonne du training set Xtrain.On centre et réduit les données de Xtest avec moy et ect du Xtrain
-                                  centering_red_pred <- function(X, Arch){
-                                    instance <- list()
-                                    cols <- colnames(X) #noms des colonnes de "X" sont extraits et stockées dans la variable "cols". 
-                                    for(i in cols) { #boucle qui parcourt chaque colonne du dataframe X. 
-                                      moy <- Arch[,i][1] #extrait la moyenne (1er élément) de la colonne 'i'à partir de archive.ect_mean et l'assigne à la variable "moy". 
-                                      ect <- Arch[,i][2]
-                                      X[i] <- (X[i] - moy)/ect # les données de la colonne 'i' de X sont centrées et réduites en utilisant la moyenne et ect de Xtrain.Ces nouvelles données remplacent les valeurs d'origine de X. 
-                                    }
-                                    instance$Xtest <- X #les données centreées et réduites stockées dans le dataframe 'X' sont assignées à l'objet 'instance' en tant que membre Xtest. 
-                                    class(instance) <- "Xtestcr"
-                                    return(instance)
-                                  } 
                                   
                                   fit = function(X,y, prior = NULL) {
                                     if (!is.factor(y) && !is.character(y) && !is.logical(y)) {
@@ -67,6 +36,10 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     levels <- levels(y) # on extrait les catégories(=classes) de y et on les mets dans la variable levels
                                     
                                     nlev <- nlevels(y) # on extrait le nombre de catégories de y, on a donc dans nlev le nombre de classes différentes dans y 
+                                    #on appel la fonction binarize pour binariser les données dans X
+                                    self$X <- lapply(self$X, binarize)
+                                    self$X = cbind(as.data.frame(self$X))
+     
                                     vars <- colnames(X) # on extrait les noms des colonnes du data frame des variables explicatives et on les mets dans 'vars'
                                     class_x <- class(X)[1] #on extrait la "classe"= le type de données de l'objet 'X' et on stocke la première classe trouvée dans la variable 'classe_x'. Si X est un data frame, alors class_x prend la valeur 'data.frame'
                                     
@@ -131,7 +104,7 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                       stop("y variable has to contain at least two observation per class for the estimation process.", call. = FALSE)
                                     }
                                     
-                                    ## Calcul des paramètres du modèle naive bayes gaussien (moyennne 'mu' et écarts-types 'sd' pour chaque classe)
+                                    ## Calcul des paramètres du modèle naive bayes gaussien (moyennne 'mu' et écarts-types 'sd' pour chaque classe, en fonction des données d'entrée X.
                                     
                                     #calcul des probabilités a priori pour chaque classe:
                                     
@@ -145,25 +118,32 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     }
                                     
                                     if (!NAx) { #Si la matrice X n'a pas de données manquantes, alors:
-                                      if (use_Matrix) { #Si la matrice des données 'X' est de type 'Matrix", alors:
-                                        #on itère sur les niveaux (classes) 'lev' et on calcul les paramètres mu et sd pour chaque classe:
+                                      if (use_Matrix) { #Si la classe 'Matrix' est utilisée pour manipuler les matrices, alors:
+                                        #do.call est utilisé pour appliquer une fonction anonyme à chaque niveau (classe) de 'y'
+                                        #cette fonction anonyme effectue les calculs des moyennes mu et écarts-types sd conditionnels pour chaque niveau. 
+                                        #les résultats sont stockés dans la matrice 'params'.
                                         params <- do.call("rbind", lapply(levels, function(lev) {
+                                          #on sélectionne les lignes de 'X' où la variable cible 'y' est égale au niveau actuel('lev')
                                           lev_subset <- X[y == lev, , drop = FALSE]
-                                          mu <- Matrix::colMeans(lev_subset, na.rm = TRUE)
-                                          sd <- sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * y_counts[lev]) / (y_counts[lev] - 1))
-                                          rbind(mu, sd) }))
-                                        #mu et sd pour chaque classe sont stockées dans une matrice 'params' où chaque ligne correspond à une classe. Les noms de ligne de params sont mis à jour pour correspondre aux niveaux (classes) dans le vecteur levels.
+                                          #Les variables binaires nécessitent un traitement spécifique pour calculer les moyennes et les écarts-types. Les fonctions 'is.numeric' et 'apply' sont utilisées pour distinguer les colonnes binaires des colonnes numériques:
+                                          #Si la variable est numérique et non binaire, mu utilise Matrix colMeans, sinon colMeans.
+                                          #On calcul chaque mu et chaque sd de chaque colonne 'lev_subset'
+                                          mu <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),Matrix::colMeans(lev_subset, na.rm = TRUE),colMeans(lev_subset, na.rm = TRUE))
+                                          sd <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * y_counts[lev]) / (y_counts[lev] - 1)),apply(lev_subset, 2, function(x) sqrt((sum(x) - sum(x^2) / length(x)) / (length(x) - 1))))
+                                          rbind(mu, sd) })) #on combine mu et sd en une seule matrice pour chaque niveau.
+                                        #mu et sd pour chaque classe(niveau) sont stockées dans une matrice 'params' où chaque ligne correspond à une classe. Les noms de ligne de params sont mis à jour pour correspondre aux niveaux (classes) dans le vecteur levels.
                                         mu <- params[rownames(params) == "mu", ]
                                         rownames(mu) <- levels
                                         sd <- params[rownames(params) == "sd", ]
                                         rownames(sd) <- levels
-                                      } else { #si use_matrix est faux, calcul de mu et sd avec rowsum:
-                                        mu <- rowsum(X, y, na.rm = TRUE) / y_counts
-                                        sd <- sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1))
+                                      } else { #si use_matrix est faux, calcul de mu et sd avec rowsum et en fonction si la variable est binaire ou non:
+                                        mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
+                                        sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
                                       }
                                       
-                                    } else { #si Nax a des valeurs manquantes: 
-                                        n <- if (use_Matrix) { #Le code calcule le nombre de valeurs manquantes par fonction de caractéristique (variable) pour chaque classe. Si le nombre de valeurs manquantes est inférieur à 2 pour une fonction de caractéristique, une alerte est générée:
+                                    } else { #si Nax a des valeurs manquantes:
+                                      #Le code calcule le nombre de valeurs manquantes par fonction de caractéristique (variable) pour chaque classe. Si le nombre de valeurs manquantes est inférieur à 2 pour une fonction de caractéristique, une alerte est générée:
+                                        n <- if (use_Matrix) { # si 'use_Matrix' est vraie, on utilise 'Matrix::colSums' pour compter les valeurs manquantes, sinon on utilise 'rowsum.defaults'
                                         na_per_feature <- lapply(levels, function(lev) {
                                           Matrix::colSums(na_X[y == lev, , drop = FALSE], na.rm = TRUE)
                                         })
@@ -176,28 +156,31 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                         if (any(n < 2))
                                         warning("gaussian_naive_bayes(): infinite variances (NaN) are present, ",
                                                 "in each case due to less than two observations after removing missing values.", call. = FALSE)
-                                      
+                                        #on effectue des calculs similaires à la première branche, mais en ajustant les calculs en fonctions de 'n' (nombre d'observations) :
                                         if (use_Matrix) {
                                           params <- do.call("rbind", lapply(levels, function(lev) {
-                                            lev_subset <- x[y == lev, , drop = FALSE]
-                                            mu <- Matrix::colMeans(lev_subset, na.rm = TRUE)
+                                            lev_subset <- X[y == lev, , drop = FALSE]
+                                            mu <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),Matrix::colMeans(lev_subset, na.rm = TRUE),colMeans(lev_subset, na.rm = TRUE))
                                             nlev <- n[rownames(n) == lev]
-                                            sd <- sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * nlev) / (nlev - 1))
+                                            sd <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * y_counts[lev]) / (y_counts[lev] - 1)),apply(lev_subset, 2, function(x) sqrt((sum(x) - sum(x^2) / length(x)) / (length(x) - 1))))
                                             rbind(mu, sd) }))
-                                          mu <- params[rownames(params) == "mu", ] ; rownames(mu) <- levels
-                                          sd <- params[rownames(params) == "sd", ] ; rownames(sd) <- levels
+                                          mu <- params[rownames(params) == "mu", ]
+                                          rownames(mu) <- levels
+                                          sd <- params[rownames(params) == "sd", ]
+                                          rownames(sd) <- levels
                                         } else {
-                                          mu <- rowsum(x, y, na.rm = TRUE) / n
-                                          sd <- sqrt((rowsum(x^2, y, na.rm = TRUE) - mu^2 * n) / (n - 1))
+                                          mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
+                                          sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
                                         }
                                     }
                                     
+                                    #On assigne les résultats aux propriétés de la classe 'private' pour une utilisation ultérieure. Cela inclut les données X et y, les niveaux de la variable cible 'y', les moyennes et sd conditionnels, les probabilités a priori et l'appel de la fonction. 
                                     private$data <- list(x = X, y = y)
                                     private$levels <- levels
                                     private$params <- list(mu = mu, sd = sd)
                                     private$prior <- prior
                                     private$call <- match.call()
-                                  }, #fin de la fonction "fit"
+                                  } #fin de la fonction "fit"
                                     
                                   ## Méthode de prédiction ##
                                   
@@ -261,7 +244,6 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                     }
                                     #Renvoie des classes prédites:
                                     return(factor(lev[max.col(post, "first")], levels =lev))
-                                      }
                                   }
                                     
                                  ## Méthode predict_proba ##
@@ -277,7 +259,7 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                       #les colonnes sont nommées avec les niveaux de classe 'lev'
                                       #fonction 'apply' applique une fonction sur chaque colonne ('2') de la matrice 'post'
                                       #la fonction calcul les probabilités pour chaque classe
-                                      post <- t(as.matrix(apply(post, 2, function(x) 1 / sum(exp(post - x)))))
+                                      post <- t(apply(post, 2, function(x) 1 / sum(exp(post - x))))
                                       colnames(post) <- private$levels
                                       return(post)
                                     #Si il y a plusieurs observations (n>1) dans les données "newdata", le calcul des probabilités est appliqué à toutes les observations: 
@@ -296,13 +278,13 @@ Gaussian_Naive_Bayes = R6Class("Gaussian_Naive_Bayes",
                                       }
                       
                                         #Si on est dans le cas où il y a une seule observation: on ajoute des noms de colonne à la matrice 'result'. Dans tout les cas, on renvoie la matrice normalisée des probabilités. 
-                                        if (n_obs ==1) {
-                                          dimnames(result) <- list(NULL, private$levels)
-                                          return(result)
+                                      if (n_obs ==1) {
+                                        dimnames(result) <- list(NULL, private$levels)
+                                        return(result)
                                       } else {
-                                          return(result)
+                                        return(result)
                                       }
-                                  }
+                                    }
                             
                                 
                                
