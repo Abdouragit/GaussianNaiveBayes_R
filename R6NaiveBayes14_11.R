@@ -1,16 +1,47 @@
+
+setwd("~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6")
+
+
+data <- read.csv("Iris.csv")
+
+data <- data[,-1]
+
+data$categorie <- rep(c("A", "B"), length.out =150)
+
+data <- data
+
+chemin_sortie_csv <- "~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6/Irismodifie.csv"
+
+write.csv(data, file = chemin_sortie_csv, row.names=FALSE)
+
 library(R6)
+
+set.seed(123)
+
+# Créez un vecteur d'indices pour les données d'entraînement
+indices_train <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
+
+# Créez les ensembles d'entraînement
+Xtrain <- data[indices_train, !colnames(data) %in% "Species"]  # Exclut species
+ytrain <- data[indices_train, "Species"]    # Dernière colonne
+
+# Créez les ensembles de test
+Xtest <- data[-indices_train, !colnames(data) %in% "Species"]  # Exclut la dernière colonne
+ytest <- data[-indices_train, "Species"] 
+
 
 Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                 private = list(
                                   binarize = function(column) {
                                     if (is.numeric(column)) {
                                       return(column)
-                                    } else if (is.factor(column) || is.character(column)) {
+                                    } else if (is.factor(column) || is.character(column) || is.logical(column)) {
                                       unique_values <- unique(column)
                                       binary_columns <- lapply(unique_values, function(value) ifelse(column == value, 1, 0))
                                       names(binary_columns) <- paste0(names(column), "_", unique_values)
                                       return(as.data.frame(binary_columns))
                                     } else {
+                                      message("Column with type ", class(column), " encountered.")
                                       stop("Only character, factor, or numerical columns must be entered.")
                                     }
                                   }, 
@@ -43,10 +74,10 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                 
                                 public = list(
                                   #champs:
-                                  X <- NA,
-                                  y <- NA,
-                                  params <- NA,
-                                  prior <- NA,
+                                  X  = NA,
+                                  y = NA,
+                                  params = NA,
+                                  prior = NA,
                                   
                                   fit = function(X,y, prior = NULL) {
                                     if (!is.factor(y) && !is.character(y) && !is.logical(y)) {
@@ -60,9 +91,13 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     
                                     nlev <- nlevels(y)
                                     
-                                    self$X <- lapply(self$X, binarize)
+                                    self$X <- lapply(self$X, private$binarize)
+                                    
+                                    print("binarization en cours dans le fit")
                                     self$X = cbind(as.data.frame(self$X))
                                     
+                                    print("binarize fit est réussi")
+                                  
                                     vars <- colnames(X) 
                                     class_x <- class(X)[1] 
                                     
@@ -323,5 +358,9 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   }
                                 )
 )
-                      
-                                  
+
+
+NB <- Gaussian_Naive_Bayes$new()
+NB$fit(Xtrain, ytrain)
+
+
