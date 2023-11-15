@@ -1,20 +1,25 @@
+rm(list = ls())
+
 
 setwd("~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6")
 
 
-data <- read.csv("Iris.csv")
+data <- read.csv("Irismodifie.csv")
 
-data <- data[,-1]
+#data <- data[,-1]
 
-data$categorie <- rep(c("A", "B"), length.out =150)
+#data$categorie <- rep(c("A", "B"), length.out =150)
 
-data <- data
+#data <- data
 
-chemin_sortie_csv <- "~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6/Irismodifie.csv"
+#chemin_sortie_csv <- "~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6/Irismodifie.csv"
 
-write.csv(data, file = chemin_sortie_csv, row.names=FALSE)
+#write.csv(data, file = chemin_sortie_csv, row.names=FALSE)
 
 library(R6)
+
+install.packages('Matrix')
+library(Matrix)
 
 set.seed(123)
 
@@ -44,7 +49,24 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       message("Column with type ", class(column), " encountered.")
                                       stop("Only character, factor, or numerical columns must be entered.")
                                     }
-                                  }, 
+                                  },
+                                  
+                                  check_numeric = function(X) {
+                                  # Assurez-vous que les noms de colonnes sont uniques
+                                  colnames(X) <- make.names(colnames(X), unique = TRUE)
+                                    
+                                    if (!is.matrix(X)) {
+                                      warning("x was coerced to a matrix(x a été converti en matrice).", call. = FALSE)
+                                      X <- as.matrix(as.data.frame(X))
+                                    }
+                                    
+                                    non_numeric_columns <- lapply(X, function(col) !is.numeric(col))
+                                    
+                                    if (any(unlist(non_numeric_columns))) {
+                                      warning("Columns ", paste(names(non_numeric_columns)[unlist(non_numeric_columns)], collapse = ", "), " were coerced to numeric(columns ont été converties en numérique).", call. = FALSE)
+                                      X[, names(non_numeric_columns)[unlist(non_numeric_columns)]] <- lapply(X[, names(non_numeric_columns)[unlist(non_numeric_columns)]], as.numeric)
+                                    }
+                                  },
                                   
                                   get_gaussian_tables = function(params) {
                                     if (!is.list(params))
@@ -80,7 +102,7 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   prior = NA,
                                   
                                   fit = function(X,y, prior = NULL) {
-                                    if (!is.factor(y) && !is.character(y) && !is.logical(y)) {
+                                    if (!is.factor(typeof(y)) && !is.character(typeof(y)) && !is.logical(typeof(y))) {
                                       stop("y must be either a factor, character, or logical vector", call. = FALSE)
                                     }
                                     if (!is.factor(y)) {
@@ -92,30 +114,25 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     nlev <- nlevels(y)
                                     
                                     self$X <- lapply(self$X, private$binarize)
-                                    
-                                    print("binarization en cours dans le fit")
                                     self$X = cbind(as.data.frame(self$X))
                                     
-                                    print("binarize fit est réussi")
+                                    print("binarize dans le fit est réussi")
+                                    
+                                    X <- private$check_numeric(X)
+                                    
+                                    print("check_numeric dans le fit est réussi")
                                   
                                     vars <- colnames(X) 
                                     class_x <- class(X)[1] 
                                     
-                                    use_Matrix <- class_x %in% .matrix_classes 
-                                    
-                                    if (!is.matrix(X) && !use_Matrix) { 
-                                      warning("x was coerced to a matrix(x a été converti en matrice).", call. = FALSE)
-                                      x <- as.matrix(X) 
-                                      if (mode(X) != "numeric") { 
-                                        stop("x must be a matrix/dgCMatrix with integer columns.", call. = FALSE)
-                                      }
-                                    }
+                                    matrix_classes <- c("matrix", "dgCMatrix")
+                                    use_Matrix <- class_x %in% matrix_classes 
                                     
                                     if (use_Matrix) { 
                                       if (!"Matrix" %in% rownames(utils::installed.packages())) {
                                         stop("Please install the \"Matrix\" package.", call. = FALSE)
                                       }
-                                      
+                                    
                                       if (class_x != "dgCMatrix") {
                                         stop("dgCMatrix class from the Matrix package is the only supported class.", call. = FALSE)
                                       }
