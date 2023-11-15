@@ -1,0 +1,109 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+## first trial, making a Rshiny structure
+
+```{r}
+library('shiny')
+
+
+ui <- fluidPage(
+  titlePanel("Naive Gaussian Bayes Package Test"),
+  sidebarLayout(
+    sidebarPanel(
+      # Add input widgets here
+      'nooooon'
+    ),
+    mainPanel(
+      # Add output widgets here
+      sidebarLayout(
+        sidebarPanel(
+          # Add input widgets here
+          'nooooon'
+        ),
+        mainPanel(
+          # Add output widgets here
+          'ouiiiii')
+          
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  # Add server logic here
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+## Add file selector button
+```{r}
+library(shiny)
+#library(NaiveBayesGaussianR6)
+
+ui <- fluidPage(
+  titlePanel("Select a file"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("option", "Choose an option:",
+                  choices = c(".csv", ".xlsx", ".txt")
+                  ),
+      fileInput("file1", "Choose File",
+                accept = c(".csv")
+                ),
+      #textInput('Number of Rows'),
+      actionButton("show", "Show first 5 rows"),
+      #actionButton("", "Show first 5 rows")
+      ),
+    
+    mainPanel(
+      tableOutput("contents")
+    )
+  )
+)
+
+server <- function(input, output) {
+  data <- reactive({
+    req(input$file1)
+    read.csv(input$file1$datapath, header = TRUE)
+  })
+
+  output$contents <- renderTable({
+    if(input$show == 0) {
+      return(NULL)
+    } else {
+      head(data(), 5)
+    }
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+
+## dashboard version experiment
+
+```{r}
+library(shiny)
+library(shinydashboard)
+
+ui <- dashboardPage(
+  dashboardHeader(),
+  dashboardSidebar(),
+  dashboardBody()
+)
+
+server <- function(input, output) { }
+
+shinyApp(ui, server)
+```
+
+
+
+
