@@ -1,4 +1,5 @@
-# installation et chargement des librairies nécessaires :
+# installation (si pas déjà fait) et chargement des librairies nécessaires :
+# en dehors de la classe :
 if (!requireNamespace("xlsx", quietly = TRUE)) {
   install.packages("xlsx")
 }
@@ -45,23 +46,30 @@ dim(data_test)
 table(data_train$diagnosis)/sum(table(data_train$diagnosis))
 table(data_test$diagnosis)/sum(table(data_test$diagnosis))
 
-# split des prédicteurs (X) et de la cible (y) :
+# split des prédicteurs (X) et du label (y) :
 X_train <- subset(data_train, select = -diagnosis)
-dim(X_train) # vérification des dimensions du set
+class(X_train) # df
+dim(X_train) # (397, 30)
 
 y_train <- data_train[, "diagnosis"]
-class(y_train) # vérification de la classe
+class(y_train) # character (vecteur)
 
 X_test <- subset(data_test, select = -diagnosis)
-dim(X_test) # vérification des dimensions du set
+class(X_test) # df
+dim(X_test) # (172, 30)
 
 y_test <- data_train[, "diagnosis"]
-class(y_test) # vérification de la classe
+class(y_test) # character (vecteur)
+
+# fonction binarize :
 
 binarize = function(column) {
+  # vérifier que la colonne est numérique
   if (is.numeric(column)) {
     return(column)
+  # sinon si colonne = vecteur factoriel, de caractères, ou logique
   } else if (is.factor(column) || is.character(column) || is.logical(column)) {
+    # retrieve les valeurs uniques de colonnes
     unique_values <- unique(column)
     binary_columns <- lapply(unique_values, function(value) ifelse(column == value, 1, 0))
     names(binary_columns) <- paste0(names(column), "_", unique_values)
@@ -71,6 +79,8 @@ binarize = function(column) {
     stop("Only character, factor, or numerical columns must be entered.")
   }
 }
+
+# fonction check_numeric :
 
 check_numeric = function(X) {
   # Assurez-vous que les noms de colonnes sont uniques
@@ -88,6 +98,8 @@ check_numeric = function(X) {
     X[, names(non_numeric_columns)[unlist(non_numeric_columns)]] <- lapply(X[, names(non_numeric_columns)[unlist(non_numeric_columns)]], as.numeric)
   }
 }
+
+# fonction get_gaussian_tables :
 
 get_gaussian_tables = function(params) {
   if (!is.list(params))
@@ -114,44 +126,52 @@ get_gaussian_tables = function(params) {
   tables
 }
 
+# affectation des trainset aux objets de la classe :
+
 y <- y_train
 X <- X_train
 
 print(y)
-class(y)
-typeof(y)
+class(y) # vecteur factoriel, de caractères, ou logique
+typeof(y) # character
 
 print(X)
-class(X)
-typeof(X)
+class(X) # df
+typeof(X) # liste
 
-if (!is.factor(typeof(y)) && !is.character(typeof(y)) && !is.logical(typeof(y))) { # correction : ajout de typeof()
+# vérifie que les données dans y sont bien un vecteur :
+if (!is.factor(typeof(y)) && !is.character(typeof(y)) && !is.logical(typeof(y))) {
   stop("y must be either a factor, character, or logical vector", call. = FALSE)
 }
 
-class(y)
+# vérifie la classe de y :
+class(y) # character
 
+# transforme y en facteur s'il n'est pas déjà un facteur :
 if (!is.factor(y)) {
   y <- factor(y)
 }
 
-class(y)
+# vérifie la factorisation de y :
+class(y) # factor
 
-levels_y <- levels(y)
-print(levels_y)
-class(levels_y)
+levels_y <- levels(y) # récupère les modalités de y
+print(levels_y) # "B" "M"
+class(levels_y) # character
 
-nlev <- nlevels(y)
-print(nlev)
+nlev <- nlevels(y) # nombre de modalités de y
+print(nlev) # 2
 
+# binarise X :
 X <- lapply(X, binarize)
+# à supprimer après test :
 print(X)
-class(X) # supp : liste
-typeof(X)
+class(X) # liste
+typeof(X) # liste
 
 X = cbind(as.data.frame(X))
 class(X) # df
-typeof(X)
+typeof(X) # liste
 
 vars <- colnames(X)
 print(vars)
@@ -159,25 +179,21 @@ class(vars) # character
 
 class_x <- class(X)[1]
 class(class_x) # character
-typeof(class_x)
+typeof(class_x) # character
 
-class(X)
-typeof(X)
-
-is.numeric(X)
+is.numeric(X) # FALSE
 
 if (!is.matrix(X)) {
-  print(class(X))
-  print(typeof(X))
+  print(class(X)) # à supprimer après test
+  print(typeof(X)) # à supprimer après test
   warning("x was coerced to a matrix.", call. = FALSE)
   X <- as.matrix(X)
-  print(class(X))
-  print(typeof(X))
-  if (!is.numeric(X)) { # correction : remplacement de mode(X) par typeof(X)
+  print(class(X)) # à supprimer après test
+  print(typeof(X)) # à supprimer après test
+  if (!is.numeric(X)) {
     X <- as.numeric(X)
-    #stop("x must be a matrix/dgCMatrix with numeric columns.", call. = FALSE)
-    print(class(X))
-    print(typeof(X))
+    print(class(X)) # à supprimer après test
+    print(typeof(X)) # à supprimer après test
   }
 }
 
@@ -214,10 +230,10 @@ if (NAx) {
 }
 
 y_counts <- stats::setNames(tabulate(y), levels_y)
-print(y_counts)
+print(y_counts) # B : 249 // M : 148
 
 y_min <- y_counts <2
-print(y_min)
+print(y_min) # B : FALSE // M : FALSE
 
 if (any(y_min)) {
   stop("y variable has to contain at least two observation per class for the estimation process.", call. = FALSE)
@@ -235,53 +251,44 @@ if (is.null(prior)) {
 }
 
 print(prior)
+
 lev <- levels_y
 
+# si pas de NaN dans X
 if (!NAx) {
-  if (is.matrix(X)) {
+    # calcul des moyennes et écarts-type pour chaque prédicteur dans chaque classe
     params <- do.call("rbind", lapply(levels_y, function(lev) {
-      lev_subset <- X[y == lev, , drop = FALSE]
+      lev_subset <- X[y == lev, , drop = FALSE] # sous-matrice de X selon les modalités de y
       
       print(class(lev_subset)) # à supprimer
       
-      # Vérification si lev_subset est numérique
-      if (all(sapply(lev_subset, is.numeric))) {
-        mu <- colMeans(lev_subset, na.rm = TRUE)
-      } else {
-        mu <- apply(lev_subset, 2, function(X) mean(X, na.rm = TRUE))
+      if (all(sapply(lev_subset, is.numeric))) { # si lev_subset numérique
+        mu <- colMeans(lev_subset, na.rm = TRUE) # calcule moyenne
+      } else { # si lev_subset pas numérique
+        mu <- apply(lev_subset, 2, function(X) mean(X, na.rm = TRUE)) # calcule moyenne
       }
       
       print(mu) # à supprimer
       
-      # Calcul de sd
-      sd <- apply(lev_subset, 2, function(X) 
+      sd <- apply(lev_subset, 2, function(X) # calcule écart-type
         sqrt(mean(X^2, na.rm = TRUE) - mean(X, na.rm = TRUE)^2))
       
       print(sd) # à supprimer
       
-      rbind(mu, sd)
+      rbind(mu, sd) # rassemble les mu et sd en ligne
     }))
     
-    mu <- params[rownames(params) == "mu", ]
-    rownames(mu) <- levels_y
-    sd <- params[rownames(params) == "sd", ]
-    rownames(sd) <- levels_y
+    # matrice des mu et sd
+    mu <- params[rownames(params) == "mu", ] # retrieve les lignes "mu"
+    rownames(mu) <- levels_y # affecte aux mu les modalités de y correspondantes
+    sd <- params[rownames(params) == "sd", ] # # retrieve les lignes "sd"
+    rownames(sd) <- levels_y # affecte aux sd les modalités de y correspondantes
     
     print(mu) # à supprimer
     print(sd) # à supprimer
-    
-  } else { 
-    mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), 
-                 rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
-    sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), 
-                 sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
-  }
-  
-  print(mu) # à supprimer
-  print(sd) # à supprimer
-  
-} else {
-  if (is.matrix(X)) { 
+
+# si NaN dans X  
+} else { 
     na_per_feature <- lapply(levels_y, function(lev) {
       colSums(na_X[y == lev, , drop = FALSE], na.rm = TRUE)
     })
@@ -291,29 +298,26 @@ if (!NAx) {
     n_feature_obs <- y_counts - do.call("rbind", na_per_feature)
     rownames(n_feature_obs) <- levels_y
     n_feature_obs
-  } else {
-    y_counts - rowsum.default(na_X, y)
-  }
+  
   if (any(n < 2))
     warning("gaussian_naive_bayes(): infinite variances (NaN) are present, ",
             "in each case due to less than two observations after removing missing values.", call. = FALSE)
   
-  if (is.matrix(X)) {
-    params <- do.call("rbind", lapply(levels_y, function(lev) {
-      lev_subset <- X[y == lev, , drop = FALSE]
-      mu <- ifelse(all(sapply(lev_subset, is.numeric)), colMeans(lev_subset, na.rm = TRUE), apply(lev_subset, 2, function(x) mean(x, na.rm = TRUE)))
-      nlev <- n[rownames(n) == lev]
-      sd <- apply(lev_subset, 2, function(x) sqrt(mean(x^2, na.rm = TRUE) - mean(x, na.rm = TRUE)^2))
-      rbind(mu, sd)
-    }))
-    mu <- params[rownames(params) == "mu", ]
-    rownames(mu) <- levels_y
-    sd <- params[rownames(params) == "sd", ]
-    rownames(sd) <- levels_y
-  } else {
-    mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
-    sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
-  }
+  params <- do.call("rbind", lapply(levels_y, function(lev) {
+    lev_subset <- X[y == lev, , drop = FALSE]
+    mu <- ifelse(all(sapply(lev_subset, is.numeric)), 
+                  colMeans(lev_subset, na.rm = TRUE), 
+                  apply(lev_subset, 2, 
+                        function(x) mean(x, na.rm = TRUE)))
+    nlev <- n[rownames(n) == lev]
+    sd <- apply(lev_subset, 2, function(x) 
+      sqrt(mean(x^2, na.rm = TRUE) - mean(x, na.rm = TRUE)^2))
+    rbind(mu, sd)
+  }))
+  mu <- params[rownames(params) == "mu", ]
+  rownames(mu) <- levels_y
+  sd <- params[rownames(params) == "sd", ]
+  rownames(sd) <- levels_y
 }
 
 

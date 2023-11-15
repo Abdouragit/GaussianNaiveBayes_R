@@ -1,9 +1,15 @@
 # installation et chargement des librairies nécessaires :
-#install.packages("xlsx") # une fois
+if (!requireNamespace("xlsx", quietly = TRUE)) {
+  install.packages("xlsx")
+}
 library(xlsx)
-#install.packages("rsample")
+if (!requireNamespace("rsample", quietly = TRUE)) {
+  install.packages("rsample")
+}
 library(rsample)
-install.packages("Matrix") # très long à partir des sources
+if (!requireNamespace("Matrix", quietly = TRUE)) {
+  install.packages("Matrix")
+}
 library(Matrix)
 
 library(R6)
@@ -65,8 +71,6 @@ class(y_train)
 y_test <- as.matrix(y_test)
 class(y_test)
 
-showClass(CsparseMatrix)
-
 Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                 private = list(
                                   binarize = function(column) {
@@ -81,7 +85,24 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       message("Column with type ", class(column), " encountered.")
                                       stop("Only character, factor, or numerical columns must be entered.")
                                     }
-                                  }, 
+                                  },
+                                  
+                                  check_numeric = function(X) {
+                                    # Assurez-vous que les noms de colonnes sont uniques
+                                    colnames(X) <- make.names(colnames(X), unique = TRUE)
+                                    
+                                    if (!is.matrix(X)) {
+                                      warning("X was coerced to a matrix.", call. = FALSE)
+                                      X <- as.matrix(as.data.frame(X))
+                                    }
+                                    
+                                    non_numeric_columns <- lapply(X, function(col) !is.numeric(col))
+                                    
+                                    if (any(unlist(non_numeric_columns))) {
+                                      warning("Columns ", paste(names(non_numeric_columns)[unlist(non_numeric_columns)], collapse = ", "), " were coerced to numeric(columns ont été converties en numérique).", call. = FALSE)
+                                      X[, names(non_numeric_columns)[unlist(non_numeric_columns)]] <- lapply(X[, names(non_numeric_columns)[unlist(non_numeric_columns)]], as.numeric)
+                                    }
+                                  },
                                   
                                   get_gaussian_tables = function(params) {
                                     if (!is.list(params))
@@ -120,7 +141,7 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     if (!is.factor(typeof(y)) && !is.character(typeof(y)) && !is.logical(typeof(y))) { # correction : ajout de typeof()
                                       stop("y must be either a factor, character, or logical vector", call. = FALSE)
                                     }
-                                    if (!is.factor(y)) {
+                                    if (!is.factor(typeof(y))) {
                                       y <- factor(y)
                                     }
                                     
