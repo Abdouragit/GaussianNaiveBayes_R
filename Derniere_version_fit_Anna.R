@@ -104,40 +104,34 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   prior = NA,
                                   
                                   fit = function(X,y, prior = NULL) {
+                                    # vérifie que les données dans y sont bien un vecteur :
                                     if (!is.factor(typeof(y)) && !is.character(typeof(y)) && !is.logical(typeof(y))) {
                                       stop("y must be either a factor, character, or logical vector", call. = FALSE)
                                     }
-                                    if (!is.factor(y)) {
-                                      y <- factor(y)
-                                    }
-                                    
-                                    levels_y <- levels(y)
-                                    
-                                    nlev <- nlevels(y)
-                                    
-                                    X <- as.data.frame(X)
 
-                                    self$X <- lapply(X, private$binarize)
-                                    self$X <- cbind(self$X)
+                                    # transforme y en facteur s'il n'est pas déjà un facteur :
+                                    if (!is.factor(y)) {
+                                      self$y <- factor(y)
+                                    }
+ 
+                                    levels_y <- levels(self$y) # récupère les modalités de y
+
+                                    nlev <- nlevels(self$y) # nombre de modalités de y
                                     
-                                    print("binarize dans le fit est réussi")
+                                    # binarise X :
+                                    
+                                    self$X <- lapply(X, private$binarize)
+                                    
+                                    self$X <- cbind(as.data.frame(self$X))
                                     
                                     self$X <- private$check_numeric(self$X)
                                     
-                                    print("check_numeric dans le fit est réussi")
-                                    print(class(self$X))
+                                    vars <- colnames(self$X)
                                     
-                                    vars <- colnames(X) #peut-être mettre self$X?
-                                    class_x <- class(X)[1] #là aussi?
                                     
-                                    if (class_x != "matrix" && class_x != "array") {
-                                      stop("x must be a matrix or array.", call. = FALSE)
-                                    }
+                                    class_x <- class(self$X)[1]
                                     
-                                    if (!is.matrix(X) && !is.array(X)) {
-                                      stop("x must be a matrix or array.", call. = FALSE)
-                                    }
-                                
+                                    
                                     if (nlev < 2) {
                                       stop("y must contain at least two classes.", call. = FALSE)
                                     }
@@ -146,23 +140,23 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       stop("x must have unique column names.\n", call. = FALSE)
                                     }
                                     
-                                    NAy <- anyNA(y) 
-                                    NAx <- anyNA(X)
+                                    NAy <- anyNA(self$y) 
+                                    NAx <- anyNA(self$X)
                                     
                                     if (NAy) { 
-                                      na_y_bool <- is.na(y) 
+                                      na_y_bool <- is.na(self$y) 
                                       len_na <- sum(na_y_bool) 
                                       warning(paste0("y contains ", len_na, " missing",
                                                      ifelse(len_na == 1, " value", " values"), ". ",
                                                      ifelse(len_na == 1, "It is", "They are"),
                                                      " not included (also the corresponding rows in x) ",
                                                      "into the estimation process."), call. = FALSE)
-                                      y <- y[!na_y_bool] 
-                                      X <- X[!na_y_bool, ] 
+                                      self$y <- self$y[!na_y_bool] 
+                                      self$X <- self$X[!na_y_bool, ] 
                                     }
                                     
                                     if (NAx) { 
-                                      na_X <- is.na(X) * 1 
+                                      na_X <- is.na(self$X) * 1 
                                       len_nax <- sum(na_X) 
                                       warning(paste0("x contains ", len_nax, " missing",
                                                      ifelse(len_nax == 1, " value", " values"), ". ",
@@ -170,12 +164,17 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                               call. = FALSE)
                                     }
                                     
-                                    y_counts <- stats::setNames(tabulate(y), levels_y) 
-                                    y_min <- y_counts <2 
+                                    y_counts <- stats::setNames(tabulate(self$y), levels_y)
+                                    #print(y_counts) # B : 249 // M : 148
+                                    
+                                    y_min <- y_counts <2
+                                    #print(y_min) # B : FALSE // M : FALSE
                                     
                                     if (any(y_min)) {
                                       stop("y variable has to contain at least two observation per class for the estimation process.", call. = FALSE)
                                     }
+                                    
+                                    prior <- NULL
                                     
                                     if (is.null(prior)) { 
                                       prior <- prop.table(y_counts)
@@ -186,32 +185,80 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       prior <- stats::setNames(prior / sum(prior), levels_y)
                                     }
                                     
+                                    #print(prior)
+                                    
+                                    lev <- levels_y
+                                    
+                                    # si pas de NaN dans X
                                     if (!NAx) {
-                                      params <- lapply(levels_y, function(lev) {
-                                        lev_subset <- X[y == lev, , drop = FALSE]
-                                        mu <- colMeans(lev_subset, na.rm = TRUE)
-                                        sd <- apply(lev_subset, 2, function(x) sqrt(sum(x^2, na.rm = TRUE) / length(x) - (sum(x, na.rm = TRUE) / length(x))^2)) 
-                                        list(mu = mu, sd = sd)
+                                      # calcul des moyennes et écarts-type pour chaque prédicteur dans chaque classe
+                                      params <- do.call("rbind", lapply(levels_y, function(lev) {
+                                        lev_subset <- self$X[self$y == lev, , drop = FALSE] # sous-matrice de X selon les modalités de y
+                                        
+                                        #print(class(lev_subset)) # à supprimer
+                                        
+                                        if (all(sapply(lev_subset, is.numeric))) { # si lev_subset numérique
+                                          mu <- colMeans(lev_subset, na.rm = TRUE) # calcule moyenne
+                                        } else { # si lev_subset pas numérique 
+                                          print(class(mu))
+                                          mu <- apply(lev_subset, 2, function(x) {print(class(x)) 
+                                            mean(x, na.rm = TRUE)
+                                          } ) # calcule moyenne
+                                        }
+                                        
+                                        #print(mu) # à supprimer
+                                        print(class(lev_subset))
+                                        sd <- apply(lev_subset, 2, function(x) {print(class(x))# calcule écart-type
+                                          sqrt(mean(x^2, na.rm = TRUE) - mean(x, na.rm = TRUE)^2)})
+                                        
+                                        #print(sd) # à supprimer
+                                        
+                                        rbind(mu, sd) # rassemble les mu et sd en ligne
+                                      }))
+                                      
+                                      # matrice des mu et sd
+                                      mu <- params[rownames(params) == "mu", ] # retrieve les lignes "mu"
+                                      rownames(mu) <- levels_y # affecte aux mu les modalités de y correspondantes
+                                      sd <- params[rownames(params) == "sd", ] # # retrieve les lignes "sd"
+                                      rownames(sd) <- levels_y # affecte aux sd les modalités de y correspondantes
+                                      
+                                      #print(mu) # à supprimer
+                                      #print(sd) # à supprimer
+                                      
+                                      # si NaN dans X  
+                                    } else { 
+                                      na_per_feature <- lapply(levels_y, function(lev) {
+                                        colSums(na_X[self$y == lev, , drop = FALSE], na.rm = TRUE)
                                       })
-                                      mu <- do.call("rbind", lapply(params, function(x) x$mu))
-                                      sd <- do.call("rbind", lapply(params, function(x) x$sd))
-                                      rownames(mu) <- rownames(sd) <- levels_y
-                                    } else {
-                                      n_feature_obs <- lapply(levels_y, function(lev) {
-                                        lev_subset <- X[y == lev, , drop = FALSE]
-                                        colSums(is.na(lev_subset), na.rm = TRUE)
-                                      })
-                                      n_feature_obs <- do.call("rbind", n_feature_obs)
-                                      n_feature_obs <- y_counts - n_feature_obs
-                                      mu <- if (is.numeric(X) && !all(X %in% c(0, 1))) {
-                                        rowsum(X, y, na.rm = TRUE) / y_counts
-                                      } else {
-                                        colMeans(X, na.rm = TRUE)
-                                      }
-                                      sd <- apply(X, 2, function(x) sqrt(sum(x^2, na.rm = TRUE) / length(x) - (sum(x, na.rm = TRUE) / length(x))^2))
+                                      
+                                      #print(na_per_feature) # à supprimer
+                                      
+                                      n_feature_obs <- y_counts - do.call("rbind", na_per_feature)
+                                      rownames(n_feature_obs) <- levels_y
+                                      n_feature_obs
+                                      
+                                      if (any(n < 2))
+                                        warning("gaussian_naive_bayes(): infinite variances (NaN) are present, ",
+                                                "in each case due to less than two observations after removing missing values.", call. = FALSE)
+                                      
+                                      params <- do.call("rbind", lapply(levels_y, function(lev) {
+                                        lev_subset <- self$X[self$y == lev, , drop = FALSE]
+                                        mu <- ifelse(all(sapply(lev_subset, is.numeric)), 
+                                                     colMeans(lev_subset, na.rm = TRUE), 
+                                                     apply(lev_subset, 2, 
+                                                           function(x) mean(x, na.rm = TRUE)))
+                                        nlev <- n[rownames(n) == lev]
+                                        sd <- apply(lev_subset, 2, function(x) 
+                                          sqrt(mean(x^2, na.rm = TRUE) - mean(x, na.rm = TRUE)^2))
+                                        rbind(mu, sd)
+                                      }))
+                                      mu <- params[rownames(params) == "mu", ]
+                                      rownames(mu) <- levels_y
+                                      sd <- params[rownames(params) == "sd", ]
+                                      rownames(sd) <- levels_y
                                     }
                                     private$vars <- vars
-                                    private$data <- list(x = X, y = y)
+                                    private$data <- list(x = self$X, y = self$y)
                                     private$levels_y <- levels_y
                                     private$params <- list(mu = mu, sd = sd)
                                     private$prior <- prior
