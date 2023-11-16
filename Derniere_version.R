@@ -18,8 +18,7 @@ data <- read.csv("Irismodifie.csv")
 
 library(R6)
 
-install.packages('Matrix')
-library(Matrix)
+
 
 set.seed(123)
 
@@ -39,33 +38,36 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                 private = list(
                                   binarize = function(column) {
                                     if (is.numeric(column)) {
-                                      return(column)
+                                      return(as.matrix(column))
                                     } else if (is.factor(column) || is.character(column) || is.logical(column)) {
                                       unique_values <- unique(column)
                                       binary_columns <- lapply(unique_values, function(value) ifelse(column == value, 1, 0))
                                       names(binary_columns) <- paste0(names(column), "_", unique_values)
-                                      return(as.data.frame(binary_columns))
+                                      return(as.matrix(binary_columns))
                                     } else {
                                       message("Column with type ", class(column), " encountered.")
-                                      stop("Only character, factor, or numerical columns must be entered.")
+                                      stop("Only character, factor, logical, or numerical columns must be entered.")
                                     }
                                   },
                                   
-                                  check_numeric = function(X) {
-                                  # Assurez-vous que les noms de colonnes sont uniques
-                                  colnames(X) <- make.names(colnames(X), unique = TRUE)
-                                    
+                                  check_numeric = function (X) {
                                     if (!is.matrix(X)) {
-                                      warning("x was coerced to a matrix(x a été converti en matrice).", call. = FALSE)
-                                      X <- as.matrix(as.data.frame(X))
+                                      #print(class(X))
+                                      #print(typeof(X))
+                                      warning("x was coerced to a matrix.", call. = FALSE)
+                                      X <- as.matrix(X)
+                                      #print(class(X))
+                                      #print(typeof(X))
                                     }
                                     
-                                    non_numeric_columns <- lapply(X, function(col) !is.numeric(col))
-                                    
-                                    if (any(unlist(non_numeric_columns))) {
-                                      warning("Columns ", paste(names(non_numeric_columns)[unlist(non_numeric_columns)], collapse = ", "), " were coerced to numeric(columns ont été converties en numérique).", call. = FALSE)
-                                      X[, names(non_numeric_columns)[unlist(non_numeric_columns)]] <- lapply(X[, names(non_numeric_columns)[unlist(non_numeric_columns)]], as.numeric)
+                                    if (!is.numeric(unlist(X))) { 
+                                      warning("Matrix elements were coerced to numeric")
+                                      X <- as.matrix(as.numeric(unlist(X)))
                                     }
+                                    
+                                    #print(class(X))
+                                    #print(typeof(X))
+                                    return(X)
                                   },
                                   
                                   get_gaussian_tables = function(params) {
@@ -113,31 +115,29 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     
                                     nlev <- nlevels(y)
                                     
-                                    self$X <- lapply(self$X, private$binarize)
-                                    self$X = cbind(as.data.frame(self$X))
+                                    X <- as.data.frame(X)
+
+                                    self$X <- lapply(X, private$binarize)
+                                    self$X <- cbind(self$X)
                                     
                                     print("binarize dans le fit est réussi")
                                     
-                                    X <- private$check_numeric(X)
+                                    self$X <- private$check_numeric(self$X)
                                     
                                     print("check_numeric dans le fit est réussi")
-                                  
-                                    vars <- colnames(X) 
-                                    class_x <- class(X)[1] 
+                                    print(class(self$X))
                                     
-                                    matrix_classes <- c("matrix", "dgCMatrix")
-                                    use_Matrix <- class_x %in% matrix_classes 
+                                    vars <- colnames(X) #peut-être mettre self$X?
+                                    class_x <- class(X)[1] #là aussi?
                                     
-                                    if (use_Matrix) { 
-                                      if (!"Matrix" %in% rownames(utils::installed.packages())) {
-                                        stop("Please install the \"Matrix\" package.", call. = FALSE)
-                                      }
-                                    
-                                      if (class_x != "dgCMatrix") {
-                                        stop("dgCMatrix class from the Matrix package is the only supported class.", call. = FALSE)
-                                      }
+                                    if (class_x != "matrix" && class_x != "array") {
+                                      stop("x must be a matrix or array.", call. = FALSE)
                                     }
                                     
+                                    if (!is.matrix(X) && !is.array(X)) {
+                                      stop("x must be a matrix or array.", call. = FALSE)
+                                    }
+                                
                                     if (nlev < 2) {
                                       stop("y must contain at least two classes.", call. = FALSE)
                                     }
@@ -186,52 +186,29 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       prior <- stats::setNames(prior / sum(prior), levels_y)
                                     }
                                     
-                                    if (!NAx) { 
-                                      if (use_Matrix) { 
-                                        params <- do.call("rbind", lapply(levels_y, function(lev) {
-                                          lev_subset <- X[y == lev, , drop = FALSE]
-                                          mu <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),Matrix::colMeans(lev_subset, na.rm = TRUE),colMeans(lev_subset, na.rm = TRUE))
-                                          sd <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * y_counts[lev]) / (y_counts[lev] - 1)),apply(lev_subset, 2, function(x) sqrt((sum(x) - sum(x^2) / length(x)) / (length(x) - 1))))
-                                          rbind(mu, sd) }))
-                                        mu <- params[rownames(params) == "mu", ]
-                                        rownames(mu) <- levels_y
-                                        sd <- params[rownames(params) == "sd", ]
-                                        rownames(sd) <- levels_y
-                                      } else { 
-                                        mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
-                                        sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
-                                      }
-                                      
-                                    } else { 
-                                      n <- if (use_Matrix) { 
-                                        na_per_feature <- lapply(levels_y, function(lev) {
-                                          Matrix::colSums(na_X[y == lev, , drop = FALSE], na.rm = TRUE)
-                                        })
-                                        n_feature_obs <- y_counts - do.call("rbind", na_per_feature)
-                                        rownames(n_feature_obs) <- levels_y
-                                        n_feature_obs
+                                    if (!NAx) {
+                                      params <- lapply(levels_y, function(lev) {
+                                        lev_subset <- X[y == lev, , drop = FALSE]
+                                        mu <- colMeans(lev_subset, na.rm = TRUE)
+                                        sd <- apply(lev_subset, 2, function(x) sqrt(sum(x^2, na.rm = TRUE) / length(x) - (sum(x, na.rm = TRUE) / length(x))^2)) 
+                                        list(mu = mu, sd = sd)
+                                      })
+                                      mu <- do.call("rbind", lapply(params, function(x) x$mu))
+                                      sd <- do.call("rbind", lapply(params, function(x) x$sd))
+                                      rownames(mu) <- rownames(sd) <- levels_y
+                                    } else {
+                                      n_feature_obs <- lapply(levels_y, function(lev) {
+                                        lev_subset <- X[y == lev, , drop = FALSE]
+                                        colSums(is.na(lev_subset), na.rm = TRUE)
+                                      })
+                                      n_feature_obs <- do.call("rbind", n_feature_obs)
+                                      n_feature_obs <- y_counts - n_feature_obs
+                                      mu <- if (is.numeric(X) && !all(X %in% c(0, 1))) {
+                                        rowsum(X, y, na.rm = TRUE) / y_counts
                                       } else {
-                                        y_counts - rowsum.default(na_X, y)
+                                        colMeans(X, na.rm = TRUE)
                                       }
-                                      if (any(n < 2))
-                                        warning("gaussian_naive_bayes(): infinite variances (NaN) are present, ",
-                                                "in each case due to less than two observations after removing missing values.", call. = FALSE)
-                                      
-                                      if (use_Matrix) {
-                                        params <- do.call("rbind", lapply(levels_y, function(lev) {
-                                          lev_subset <- X[y == lev, , drop = FALSE]
-                                          mu <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),Matrix::colMeans(lev_subset, na.rm = TRUE),colMeans(lev_subset, na.rm = TRUE))
-                                          nlev <- n[rownames(n) == lev]
-                                          sd <- ifelse(is.numeric(lev_subset) && !all(lev_subset %in% c(0, 1)),sqrt((Matrix::colSums(lev_subset^2, na.rm = TRUE) - mu^2 * y_counts[lev]) / (y_counts[lev] - 1)),apply(lev_subset, 2, function(x) sqrt((sum(x) - sum(x^2) / length(x)) / (length(x) - 1))))
-                                          rbind(mu, sd) }))
-                                        mu <- params[rownames(params) == "mu", ]
-                                        rownames(mu) <- levels_y
-                                        sd <- params[rownames(params) == "sd", ]
-                                        rownames(sd) <- levels_y
-                                      } else {
-                                        mu <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), rowsum(X, y, na.rm = TRUE) / y_counts, colMeans(X, na.rm=TRUE))
-                                        sd <- ifelse(is.numeric(X) && !all(X %in% c(0,1)), sqrt((rowsum(X^2, y, na.rm = TRUE) - mu^2 * y_counts) / (y_counts - 1)), apply(X, 2, function(x) sqrt((sum(x) - sum(x^2)/length(x))/(length(x)-1))))
-                                      }
+                                      sd <- apply(X, 2, function(x) sqrt(sum(x^2, na.rm = TRUE) / length(x) - (sum(x, na.rm = TRUE) / length(x))^2))
                                     }
                                     private$vars <- vars
                                     private$data <- list(x = X, y = y)
