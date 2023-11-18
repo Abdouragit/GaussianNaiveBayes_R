@@ -1,12 +1,6 @@
 rm(list = ls())
 
-if (!requireNamespace("xlsx", quietly = TRUE)) {
-  install.packages("xlsx")
-}
-library(xlsx)
-if (!requireNamespace("rsample", quietly = TRUE)) {
-  install.packages("rsample")
-}
+
 library(rsample)
 
 library(R6)
@@ -38,7 +32,7 @@ X_test <- subset(data_test, select = -Species)
 class(X_test) # df
 dim(X_test) # (172, 30)
 
-y_test <- data_train[, "Species"]
+y_test <- data_test[, "Species"]
 class(y_test) # character (vecteur)
 
 Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
@@ -82,12 +76,12 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     return(X)
                                   },
                                   
-                                  get_gaussian_tables = function(params) {
-                                    if (!is.list(params))
+                                  get_gaussian_tables = function() {
+                                    if (!is.list(self$params))
                                       stop("get_gaussian_tables(): params must be a list with parameter estimates.", call. = FALSE)
                                     
-                                    mu <- params$mu
-                                    sd <- params$sd
+                                    mu <- self$params$mu
+                                    sd <- self$params$sd
                                     vars <- colnames(mu)
                                     n_tables <- ncol(mu)
                                     
@@ -97,14 +91,14 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       
                                       ith_tab <- as.data.frame(cbind(ith_mu, ith_sd))
                                       colnames(ith_tab) <- c("mu", "sd")
-                                      ith_tab
+                                      return (ith_tab)
                                     })
                                     
                                     names(tables) <- vars
                                     class(tables) <- "naive_bayes_tables"
                                     attr(tables, "cond_dist") <- stats::setNames(rep("Gaussian", n_tables), vars)
                                     
-                                    tables
+                                    return(tables)
                                   }
                                 ),
                                 
@@ -114,6 +108,7 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   y = NA,
                                   params = NA,
                                   prior = NA,
+                                  post = NULL,
                                   vars = NULL,
                                   levels_y = NULL,
                                   
@@ -287,22 +282,29 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     if (is.null(newdata))
                                       stop("predict.gaussian_naive_bayes(): newdata is required.", call. = FALSE)
                                     
-                                    newdata <- lapply(newdata, binarize)
+                                    newdata <- lapply(newdata, private$binarize)
                                     newdata <- cbind(as.data.frame(newdata))
+                                    
+                                    newdata <- private$check_numeric(newdata)
                                     
                                     class_x <- class(newdata)[1]
                                     
-                                    if (!is.matrix(newdata))
-                                      stop("predict.gaussian_naive_bayes(): newdata must be numeric matrix with at least one row and two named columns.", call. = FALSE)
-                                    if (is.matrix(newdata) & typeof(newdata) != "numeric")
-                                      stop("predict.gaussian_naive_bayes(): newdata must be a numeric matrix.", call. = FALSE)
+
                                     
-                                    lev <- private$levels_y
-                                    prior <- private$prior
-                                    mu <- private$params$mu
-                                    sd <- private$params$sd
-                                    row_names <- rownames(newdata)
-                                    features <- row_names[row_names %in% colnames(mu)]
+                                    if (!is.matrix(newdata)){
+                                      stop("predict.gaussian_naive_bayes(): newdata must be numeric matrix with at least one row and two named columns.", call. = FALSE)
+                                    }
+                                        if (!is.numeric(newdata)){
+                                      stop("predict.gaussian_naive_bayes(): newdata must be a numeric matrix.", call. = FALSE)
+                                      }
+                                    
+                                    lev <- self$levels_y
+                                    prior <- self$prior
+                                    mu <- self$params$mu
+                                    sd <- self$params$sd
+                                    col_names <- colnames(newdata)
+                                    features <- col_names[col_names %in% colnames(mu)]
+                                    
                                     mu <- mu[, features, drop = FALSE]
                                     sd <- sd[, features, drop = FALSE]
                                     n_features <- length(features)
@@ -310,12 +312,12 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     if (n_features == 0) {
                                       warning(paste0("predict.gaussian_naive_bayes(): no feature in newdata corresponds to ",
                                                      "features defined in the object. Classification is based on prior probabilities."), call. = FALSE)
-                                      return(factor(rep(lev[which.max(prior)], nrow = newdata)), levels_y = lev)
+                                      #return(factor(rep(lev[which.max(prior)], nrow = newdata)), levels_y = lev)
                                     } 
                                     
                                     NAx <- anyNA(newdata)
                                     if (NAx) {
-                                      ind_na <- if (use_Matrix) Matrix::which(is.na(newdata)) else which(is.na(newdata))
+                                      ind_na <- which(is.na(newdata))
                                       len_na <- length(ind_na)
                                       warning("predict.gaussian_naive_bayes(): ", len_na, " missing",
                                               ifelse(len_na == 1, " value", " values"), " discovered in the newdata. ",
@@ -326,41 +328,57 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                     eps <- ifelse(eps == 0, log(.Machine$double.xmin), log(eps))
                                     threshold <- log(threshold)
                                     
+                                    
+                                      
                                     post <- matrix(nrow = nrow(newdata), ncol = length(lev))
+                                    colnames(post) <- lev
                                     for (ith_class in seq_along(lev)) {
                                       ith_class_sd <- sd[ith_class, ]
+                                      
                                       ith_post <- -0.5 * log(2 * pi * ith_class_sd^2) - 0.5 * ((newdata - mu[ith_class, ]) / ith_class_sd)^2
+                                      print(ith_post)
+                                      
                                       if (NAx) ith_post[ind_na] <- 0
                                       ith_post[ith_post <= eps] <- threshold
-                                      post[, ith_class] <- if (use_Matrix) Matrix::colSums(ith_post) + log(prior[ith_class]) else colSums(ith_post) + log(prior[ith_class])
-                                    }
-                                    return(factor(lev[max.col(post, "first")], levels_y =lev))
+
+                                      
+                                      post[, ith_class] <- (rowSums(ith_post) + log(prior[ith_class]))
+                                    } 
+                                    self$post <- post
+                                    print(post)
+                                    cat("\n Exponentiel \n")
+                                    print(exp(post))
+                                    return(factor(lev[max.col(post, "first")], lev))
                                   },
-                                  
+
                                   predict_proba = function(X) {
                                     n_obs <- nrow(X)
-                                    n_lev <- length(private$levels_y)
+                                    n_lev <- length(self$levels_y)
                                     post <- matrix(0, nrow = n_obs, ncol = n_lev)
+                                    
                                     
                                     if (n_obs == 1) { 
                                       post <- t(apply(post, 2, function(x) 1 / sum(exp(post - x))))
-                                      colnames(post) <- private$levels_y
+                                      colnames(post) <- self$levels_y
                                       return(post)
                                       
                                     } else {
-                                      colnames(post) <- private$levels_y
+                                      colnames(post) <- self$levels_y
                                       result <- matrix(0, nrow = n_obs, ncol = n_lev)
                                       
                                       for (i in seq_len(n_obs)) {
-                                        probabilities <- exp(post[i, ] - post[i, ])
+                                        
+                                        probabilities <- exp(self$post[i,])
                                         sum_per_row <- sum(probabilities)
                                         
-                                        for (j in seq_along(private$levels_y)) {
+                                        for (j in seq_along(self$levels_y)) {
                                           result[i, j] <- probabilities[j] / sum_per_row
                                         }
                                       }
+                                      
+                                      
                                       if (n_obs ==1) {
-                                        dimnames(result) <- list(NULL, private$levels_y)
+                                        dimnames(result) <- list(NULL, self$levels_y)
                                         return(result)
                                       } else {
                                         return(result)
@@ -370,17 +388,18 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   
                                   print = function () {
                                     cat("Prior probabilities: \n")
-                                    for (lev in names(private$prior)) {
-                                      cat(paste(" ", lev, ": ", private$prior[[lev]], "\n"))
+                                    for (lev in names(self$prior)) {
+                                      cat(paste(" ", lev, ": ", self$prior[[lev]], "\n"))
                                     }
                                     
                                     cat("\nConditional Probabilities:\n")
-                                    tables <- get_gaussian_tables(private$params)
+                                    cat("----------------------------\n")
+                                    tables <- private$get_gaussian_tables()
                                     for (var in names(tables)) {
-                                      cat(paste("Variable:", var, "\n"))
+                                      cat(paste("\n Variable:", var, "\n"))
                                       for (i in seq_along(tables[[var]])) {
-                                        cat(paste(" Level", i, ":\n"))
-                                        cat(tables[[var]][[i]], "\n\n")
+                                        cat(paste("--- Level", i, ":\n"))
+                                        cat(tables[[var]][[i]], "\n")
                                       }
                                     }
                                   }, 
@@ -388,28 +407,28 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   summary = function(){
                                     
                                     cat("- Number of observations: ", length(private$data$y, "\n"))
-                                    cat("- classes in y: ",private$levels_y,"\n") # names of classes in y
+                                    cat("- classes in y: ",self$levels_y,"\n") # names of classes in y
                                     
                                     #class_count number of training samples observed in each class in y.
                                     print(table(self$y))
                                     
                                     #class_prior_ probability of each class in y.
-                                    cat("Class_prior_probabilities: ")
+                                    cat("- Class_prior_probabilities: ")
                                     print(prop.table(table(self$y)))
                                     
                                     #n_features_in_ Number of features seen during fit.
-                                    cat("- n_Features:", length(private$vars), "\n")
+                                    cat("- n_Features:", length(self$vars), "\n")
                                     
                                     #feature_names_in_ Names of features seen during fit. Defined only when X has feature names that are all strings.
-                                    cat("- Features:", private$vars, "\n")
+                                    cat("- Features:", self$vars, "\n")
                                     
                                     #standard deviation of each feature per class.
-                                    cat("standard deviation of each feature")
-                                    print(private$params$sd)
+                                    cat("Mtandard deviation of each feature")
+                                    print(self$params$sd)
                                     
                                     #theta_ mean of each feature per class.
-                                    cat("mean of each feature per class")
-                                    print(private$param$mu)
+                                    cat("Mean of each feature per class")
+                                    print(self$param$mu)
                                     
                                   }
                                 )
@@ -419,7 +438,9 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
 NB <- Gaussian_Naive_Bayes$new()
 NB$fit(X_train, y_train)
 
-NB$params
-NB$levels_y
-NB$prior
-NB$vars
+y_pred = NB$predict(X_test,threshold = 0.8,eps = 0)
+
+length(y_test[y_pred == y_test])/length(y_test)
+y_proba = NB$predict_proba(X_test)
+
+print(NB)
