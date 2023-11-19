@@ -1,0 +1,282 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+## first trial, making a Rshiny structure
+
+```{r}
+library('shiny')
+
+
+ui <- fluidPage(
+  titlePanel("Naive Gaussian Bayes Package Test"),
+  sidebarLayout(
+    sidebarPanel(
+      # Add input widgets here
+      'nooooon'
+    ),
+    mainPanel(
+      # Add output widgets here
+      sidebarLayout(
+        sidebarPanel(
+          # Add input widgets here
+          'nooooon'
+        ),
+        mainPanel(
+          # Add output widgets here
+          'ouiiiii')
+          
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  # Add server logic here
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+## Add file selector button
+```{r}
+library(shiny)
+#library(NaiveBayesGaussianR6)
+
+ui <- fluidPage(
+  titlePanel("Select a file"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("option", "Choose an option for file format:",
+                  choices = c(".csv", ".xlsx")
+                  ),
+      fileInput("file1", "Choose File",
+                accept = c(".csv")
+                ),
+      
+      selectInput("option", "Choose separator character:",
+                  choices = c(",", ";", "tab")
+                  ),
+      
+      selectInput("option", "Choose character for decimal points:",
+                  choices = c(",", ".")
+      ), 
+    
+      #textInput('Number of Rows'),
+      actionButton("show", "Show first 10 rows"),
+      #actionButton("", "Show first 10 rows")
+      ),
+    
+    mainPanel(
+      tableOutput("contents")
+    )
+  )
+)
+
+server <- function(input, output) {
+  data <- reactive({
+    req(input$file1)
+    read.csv(input$file1$datapath, header = TRUE)
+  })
+
+  output$contents <- renderTable({
+    if(input$show == 0) {
+      return(NULL)
+    } else {
+      head(data(), 10)
+    }
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+
+## dashboard version experiment
+
+```{r}
+#install.packages("caret")
+library(shiny)
+library(shinydashboard)
+library(readxl)
+library(caret)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "My Naive Bayes Gaussian App"),
+  
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Home", tabName = "home", icon = icon("home")),
+      menuItem("Import Data", tabName = "import", icon = icon("file-import")),
+      menuItem("Statistics", tabName = "statistics", icon = icon("chart-bar")),
+      menuItem("Train/Test", tabName = "traintest", icon = icon("sliders-h"))
+    )
+  ),
+  
+  dashboardBody(
+    tabItems(
+      #Home tab
+      tabItem(tabName = "home",
+              fluidRow(
+                box(
+                  title = "Instructions",
+                  status = "info",
+                  solidHeader = TRUE,
+                  width = 12,
+                  "Welcome to the Shiny Dashboard! Select the 'Import Data' tab to upload and view data."
+                )
+              )
+      ),
+      
+      # Import Data tab
+      tabItem(tabName = "import",
+              fluidRow(
+                box(
+                  title = "File Upload",
+                  status = "primary",
+                  solidHeader = TRUE,
+                  width = 12,
+                  selectInput("format", "Choose an option for file format:",
+                              choices = c(".csv", ".xlsx")
+                  ),
+                  fileInput("file1", "Choose File",
+                            accept = c(".csv", ".xlsx")
+                  ),
+                  selectInput("separator", "Choose separator character:",
+                              choices = c(",", ";", "tab")
+                  ),
+                  selectInput("decimal", "Choose character for decimal points:",
+                              choices = c(",", ".")
+                  ), 
+                  actionButton("show", "Show first 10 rows")
+                ),
+                box(
+                  title = "Data Preview",
+                  status = "success",
+                  solidHeader = TRUE,
+                  width = 12,
+                  tableOutput("contents")
+                )
+              )
+      ),
+      
+      # Statistics tab
+      tabItem(tabName = "statistics",
+              fluidRow(
+                box(
+                  title = "Descriptive Statistics",
+                  status = "warning",
+                  solidHeader = TRUE,
+                  width = 12,
+                  verbatimTextOutput("statsOutput")
+                )
+              )
+      ),
+      
+      tabItem(tabName = "traintest",
+              fluidRow(
+                box(
+                  title = "Variable Selection",
+                  status = "primary",
+                  solidHeader = TRUE,
+                  width = 6,
+                  selectInput("predictors", "Select predictor variables:",
+                              choices = colnames(data[1]),
+                              multiple = TRUE
+                  ),
+                  selectInput("response", "Select target variable:",
+                              choices = colnames(data),
+                              selected = colnames(data[1])
+                  ),
+                  
+                  actionButton("updateTrainTest", "Update Train/Test Data")
+                ),
+                box(
+                  title = "XTrain Preview",
+                  status = "success",
+                  solidHeader = TRUE,
+                  width = 6,
+                  tableOutput("xTrainPreview")
+                ),
+                box(
+                  title = "Class Distribution",
+                  status = "warning",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("classDistribution")
+                )
+              )
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  data <- reactive({
+    req(input$file1)
+    if (input$format == ".csv") {
+    return(read.csv(input$file1$datapath, header = TRUE, sep = input$separator, dec = input$decimal))
+    } else if (input$format == ".xlsx"){
+     return(readxl::read_excel(input$file1$datapath)) 
+    }
+    
+  })
+
+  output$contents <- renderTable({
+    if(input$show == 0) {
+      return(NULL)
+    } else {
+      head(data, 10)
+    }
+  })
+  
+  output$statsOutput <- renderPrint({
+    if (is.character(data)) {
+      cat("Frequency Table:\n")
+      print(table(data))
+    } else {
+      cat("Descriptive Statistics:\n")
+      print(summary(data))
+    }
+  })
+  
+  observeEvent(input$updateTrainTest, {
+    
+    updateSelectInput('predictors', "Select predictor variables:",
+                              choices = colnames(data),
+                              multiple = TRUE
+                  )
+    
+    # Subset the data based on user inputs
+    x <- data[, input$predictors, drop = FALSE]
+    y <- data[, input$response, drop = FALSE]
+    
+    # Use createDataPartition to split the data
+    set.seed(123)  # Pour la reproductibilité
+    trainIndex <- createDataPartition(y, p = 0.7, list = FALSE)
+    xTrain <- x[trainIndex, , drop = FALSE]
+    xTest <- x[-trainIndex, , drop = FALSE]
+    yTrain <- y[trainIndex, , drop = FALSE]
+    yTest <- y[-trainIndex, , drop = FALSE]
+    
+    # Update outputs
+    output$xTrainPreview <- renderTable({
+      head(xTrain, 10)
+    })
+    
+    output$classDistribution <- renderPlot({
+      par(mar = c(4, 4, 2, 2))  # Réglages des marges
+      barplot(table(yTrain), main = "Class Distribution", xlab = "Class", ylab = "Frequency")
+    })
+  })
+}
+shinyApp(ui, server)
+```
+
+
+
+

@@ -1,5 +1,6 @@
 rm(list = ls())
 
+setwd("~/Travail/Univ/M2 SISE/Cour de R/Projet r/test 17-11")
 
 library(rsample)
 
@@ -384,6 +385,18 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       }
                                     }
                                   }, 
+                                  confusion_matrix = function(y_test, y_pred){
+                                    cols = paste0('pred-', NB$levels_y)
+                                    conf_mat = array(dim = c(length(self$levels_y),length(self$levels_y)),dimnames = list(self$levels_y,cols))
+                                   
+                                    for (clas in self$levels_y) {
+                                      for (clas_pred in cols) {
+                                        compt <- table(y_pred[y_test == clas])
+                                        conf_mat[clas,] <- compt
+                                      }
+                                    }
+                                    return(conf_mat)
+                                  },
                                   
                                   print = function () {
                                     cat("\nPrior probabilities: \n")
@@ -402,31 +415,39 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   }, 
                                   
                                   summary = function(){
+                                    cat(rep(" \n",2))
+                                    cat(rep('=',10),'\n')
+                                    cat("- Number of observations: ", length(self$y),"\n")
+                                    cat(rep(" \n",2))
                                     
-                                    cat("\nNumber of observations: ", length(private$data$y), "\n")
-                                    cat("\nClasses in y: " ,self$levels_y, "\n") # names of classes in y
-                                    
-                                    cat("\nNumber of training samples observed in each class in y: ", "\n")
+                                    #class_count number of training samples observed in each class in y.
+                                    cat('- Number of training observation in each class y')
                                     print(table(self$y))
+                                    cat(rep(" \n",2))
                                     
-                                    #class_prior_ probability of each class in y.
-                                    cat("\nClass prior probabilities: ", "\n")
+                                    #Prior_ probability of each class in y.
+                                    cat("- Prior_probabilities in y: ")
                                     print(prop.table(table(self$y)))
+                                    cat(rep(" \n",2))
                                     
                                     #n_features_in_ Number of features seen during fit.
-                                    cat("\nNumber of Features: ", length(self$vars), "\n")
+                                    cat("- Number of Features:", length(self$vars), "\n")
+                                    cat(rep(" \n",2))
                                     
                                     #feature_names_in_ Names of features seen during fit. Defined only when X has feature names that are all strings.
-                                    cat("\nNames of Features: ", self$vars, "\n")
+                                    cat("- Features:", self$vars, "\n")
+                                    cat(rep(" \n",2))
                                     
                                     #standard deviation of each feature per class.
-                                    cat("\nStandard deviation of each feature per class: ", "\n")
+                                    cat("- Standard deviation of each feature: \n")
                                     print(self$params$sd)
+                                    cat(rep(" \n",2))
                                     
                                     #theta_ mean of each feature per class.
-                                    cat("\nMean of each feature per class: ", "\n")
+                                    cat("- Mean of each feature per class: \n")
                                     print(self$params$mu)
-                                    
+                                    cat(rep('=',10),'\n')
+                                    cat(rep(" \n",2))
                                   }
                                 )
 )
@@ -440,9 +461,11 @@ y_pred = NB$predict(X_test,threshold = 0.8,eps = 0)
 length(y_test[y_pred == y_test])/length(y_test)
 y_proba = NB$predict_proba(X_test)
 
-print_print = NB$print()
-
-NB$params$mu
-NB$params$sd
-
+print(NB)
 NB$summary()
+
+conf_mat = NB$confusion_matrix(y_test,y_pred)
+print(conf_mat)
+
+
+
