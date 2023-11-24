@@ -1,6 +1,6 @@
 rm(list = ls())
 
-setwd("~/Travail/Univ/M2 SISE/Cour de R/Projet r/test 17-11")
+
 
 library(rsample)
 
@@ -466,6 +466,4 @@ NB$summary()
 
 conf_mat = NB$confusion_matrix(y_test,y_pred)
 print(conf_mat)
-
-
 

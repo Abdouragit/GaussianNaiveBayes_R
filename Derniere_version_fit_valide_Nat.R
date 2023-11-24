@@ -5,6 +5,8 @@ setwd("~/Desktop/M2SISE/Cours/Prog_Stats_R/ProjetRClasseR6")
 
 
 data <- read.csv("Irismodifie.csv")
+read.csv
+help(read.csv)
 
 #data <- data[,-1]
 
