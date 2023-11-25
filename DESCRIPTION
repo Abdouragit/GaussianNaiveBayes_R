@@ -1,0 +1,14 @@
+Package: GaussianNaiveBayes
+Title: Gaussian Naive Bayes Classifier
+Version: 1.0.0
+Authors@R: c(
+    person("Ndiaye Abdourahmane", email = "abane.etu1@gmail.com", role = c("aut", "cre"), comment = c(ORCID = "YOUR-ORCID-ID")),
+    person("Narsama Annabelle", email = "annabelle.narsama@gmail.com", role = "aut","cre"),
+    person("Perez Natacha", email = "natachaperez.pro@gmail.com", role = "aut","cre"))
+Description: Gaussian Naive Bayes Classifier implementation using R6 class structure.
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Depends: R6, parallel
+Suggests: rsample
