@@ -1,0 +1,526 @@
+\documentclass[]{article}
+\usepackage{lipsum}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{xcolor}
+\usepackage{algorithmic}
+\usepackage{algorithm2e}
+\usepackage{algorithm}
+\usepackage{url}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+
+
+
+\geometry{
+left = 2cm , 
+right = 2cm ,
+bottom = 3cm ,
+}
+
+
+
+\begin{document}
+\thispagestyle{empty}
+
+\begin{center}
+    
+
+       {\LARGE\textbf{Master 2 SISE Statistiques et Informatiques pour la Science des Données} \par} \\
+       \vspace{0.8cm}
+       \normalsize Université Lumière Lyon 2 \\
+       \normalsize Année universitaire 2023–2024 \\
+        \vspace{1cm}
+        \textcolor{black}{\rule{17cm}{0.1cm}}\\[8mm]
+       {\LARGE\textbf{Naive Bayes Classifier} \par} \\
+        \vspace{0.7cm}
+       {\LARGE\textbf{Création d'un package pour R} \par} \\
+       \vspace{1cm}
+      \textcolor{black}{\rule{17cm}{0.1cm}}\\[8mm]
+        \begin{center}
+        \vspace{1cm}
+        {\LARGE\textbf{Natacha Perez} \par} \\
+        {\LARGE\textbf{Abdourahmane Ndiaye} \par} \\
+        {\LARGE\textbf{Annabelle Narsama} \par} 
+        \end{center}
+\end{center}
+\vspace{0.1cm}
+\begin{center}
+    \includegraphics[width=0.40\textwidth]{logo_univ_lyon2.jpg.jpg}
+\end{center}
+
+\newpage
+
+\rule{0.001pt}{0.001pt}\\ 
+%-------------------------------------
+\tableofcontents
+\newpage
+%-----------------------------------------
+\section{Introduction}
+\vspace{0.2\baselineskip}\\
+L'objectif de ce projet a été de créer un package pour R proposant une méthode "Bayésien Naïf" pour la classification supervisée, codé en classe R6. Ce package intégre une méthode de  parallélisation des calculs pour réduire le temps d'exécution des calculs et pour s'adapter à de gros volumes de données.Il peut être directement installer à partir de Github et il est documenté par un tutoriel en anglais qui montre l'utilisation de ces fonctionnalités. La programmation du coeur de l'algorithme Naive Bayes n'a pas nécessité de package existants. Ce package a été conçu de façon à être le plus facile d'utilisation possible.  
+\vspace{0.2\baselineskip}
+
+\section{Naïve Bayes Classifier}
+ \itshape
+\subsection{Choix du model Naïve Bayes Gaussien}
+
+Le Naïve Bayes est une famille de modèle probabilistes qui utilisent le théorème de Bayes en supposant une indépendance entre les variables explicatives pour prédire l'étiquette de la variable à prédire. 
+Il existe différents types de Naives Bayes classifier qui dépendent de la distribution des variables explicatives: Bernoulli, multinomial, poisson, non paramétrique  et Gaussien. \vspace{0.2\baselineskip}\\
+Nous avons choisi d'implémenter le classifieur bayésien naïf Gaussien. La variable cible qualitative présente \( K \geq 2 \) modalités tandis que les variables explicatives peuvent être quantitatives ou qualitatives. Les variables données en entrée à un classificateur doivent être adaptés à ce dernier, c'est pourquoi pour implémenter un classifieur bayésien naïf gaussien, il a fallu harmoniser les types de données avant de procéder aux calculs. 
+\vspace{0.2\baselineskip}
+
+\subsection{Méthodes privées: Préparation des données}
+\subsubsection{Fonction \texttt{Binarize}} 
+
+Pour harmoniser les données, notre classe R6 comporte des méthodes privées (utilisées uniquement en interne). La fonction privé \texttt{binarize} utilise 'model.matrix', qui lorsqu'elle rencontre des variables catégorielles, les encode en '0' ou '1. Chaque niveau d'une variable catégorielle devient une colonne de la matrice. Ainsi, la fonction "binarize" permet d'obtenir des variables quantitatives: 
+\vspace{0.3\baselineskip}
+
+\begin{algorithm}
+        \caption{Fonction \texttt{Binarize}}
+
+    \SetKwFunction{Binarize}{Binarize}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\Binarize{column}}{
+        \If{\Call{is.numeric}{column}}{
+            \Return \Call{model.matrix}{\textasciitilde column - 1}
+        }\ElseIf{\Call{is.factor}{column} \textbf{or} \Call{is.character}{column} \textbf{or} \Call{is.logical}{column}}{
+            \Return \Call{model.matrix}{\textasciitilde column - 1}
+        }\Else{
+            \Call{message}{"Column with type ", \Call{class}{column}, " encountered."}\;
+            \Call{stop}{"Only character, factor, logical, or numerical columns must be entered."}\;
+        }
+    }
+\end{algorithm}
+
+\newpage
+\subsubsection{Fonction \texttt{check\_numeric}} 
+Après l'encodage des variables catégorielles, une fonction privée au sein de notre classe R6, appelée \texttt{check\_numeric}, permet de s'assurer que les données d'entrée \(X\) sont sous forme de matrice et contiennent des valeurs numériques. Elle effectue des coercitions si nécessaires. En sortie, la fonction renvoie une matrice où tous les éléments sont de type numérique.
+\vspace{0.3\baselineskip}
+
+\begin{algorithm}
+    \caption{Fonction \texttt{check\_numeric}}
+    
+    \SetKwFunction{CheckNumeric}{check\_numeric}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\CheckNumeric{X}}{
+        \If{\neg\Call{is.matrix}{X}}{
+            \Call{warning}{"\(X\) was coerced to a matrix.", \textit{call.} = \textbf{FALSE}}\;
+            \(X\) $\leftarrow$ \Call{as.matrix}{X}\;
+        }
+
+        \If{\neg\Call{is.numeric}{\Call{unlist}{X}}}{
+            \Call{warning}{"Matrix elements were coerced to numeric"}\;
+            \(X\) $\leftarrow$ \Call{as.matrix}{\Call{as.numeric}{\Call{unlist}{X}}}\;
+        }
+
+        \Return{\(X\)}\;
+    }
+\end{algorithm}
+\vspace{0.2\baselineskip}
+
+\subsection{Théorème de Bayes}
+
+Soient \(\mathcal{X} = (X_1, \ldots, X_J)\) l'ensemble des variables explicatives et \(Y\) la variable à prédire (l'attribut classe comportant \(K \geq 2\) modalités). Ce problème de classification multiclasse est abordé en appliquant d'abord le théorème de Bayes aux probabilités conditionnelles spécifiques à chaque classe \(P(Y = C_k | \mathcal{X} = \mathbf{x})\), en le décomposant ainsi en produit de la vraisemblance (\textit{likelihood}) et de la probabilité a priori (\textit{prior}) normalisé par la vraisemblance des données (facteur de normalisation): \vspace{0.4\baselineskip}
+
+\[
+P(Y = C_{k} | X = \mathbf{x}) = \frac{P(Y = C_{k}) P(X = \mathbf{x} | Y = C_{k})}{P(X = \mathbf{x})}
+\]
+\vspace{0.4\baselineskip}
+
+Étant donné que les variables aléatoires \(X = (X_1, X_2, \ldots, X_d)\) sont (naïvement) supposées être conditionnellement indépendantes, la vraissemblance \(P(X = \mathbf{x} | Y = C_k)\) peut être réécrite comme suit :
+
+\[
+P(Y = C_k | X = \mathbf{x}) = \frac{P(Y = C_k) \prod_{i=1}^{d} P(X_i = x_i | Y = C_k)}{P(X_1 = x_1, \ldots, X_d = x_d)}
+\]
+\vspace{0.4\baselineskip}
+
+Étant donné que \(P(X_1 = x_1, \ldots, X_d = x_d)\) est constant, la probabilité conditionnelle \(P(Y = C_k | X = \mathbf{x})\) peut se réécrire ainsi : 
+\vspace{0.4\baselineskip}
+\[
+P(Y=C_k|X=\mathbf{x}) \propto P(Y=C_k)\prod_{i=1}^{d} P(X_i = x_i | Y = C_k)\
+\]
+
+On peut transformer ces calculs en logarithme pour transformés les multiplications en additions: 
+
+\[
+\log P(Y=C_k|X=x) \propto \log P(Y=C_k) + \sum_{i=1}^{d} \log P(X_i = x_i | Y = C_k).
+\]
+
+La classe avec la probabilité a posteriori logarithmique la plus élevée est choisie comme prédiction: 
+
+\[
+\hat{C} = \arg\max \left( \log P(Y=C_k) + \sum_{i=1}^{d} \log P(X_i = x_i | Y=C_k) \right) \hspace{2cm} (1)
+\]
+
+\newpage
+
+\subsection{Méthodes publiques}
+\subsubsection{Fonction \texttt{fit}} 
+Avant d'utiliser le package \texttt{GaussianNaiveBayes}, l'utilisateur doit préalablement subdiviser ses données en un échantillon d'apprentissage et un échantillon de test. Puis l'utilisateur appelel la méthode \texttt{fit} de notre classe en fournissant en paramètres \texttt{Xtrain} et \texttt{yTrain}.
+
+\vspace{0.4\baselineskip}
+La méthode \texttt{fit} prend en entrée \texttt{Xtrain} et \texttt{ytrain}. Dans un premier temps, elle s'assure que la variable réponse \(Y\) soit un vecteur de type factor, character ou logical. Elle binarise les variables explicatives en appelant la fonction \texttt{binarize} et s'assure que les données soient de types \texttt{numeric} en et les transformant en matrice avec la fonction \texttt{check\_numeric}. Dans un second temps, la fonction \texttt{fit} permet de calculer les probabilités a priori de chaque classe : Étant donné que la variable de réponse \(Y\) peut prendre \(K\) valeurs distinctes notées \(C_1, \ldots, C_K\), chaque probabilité a priori \(P(Y = C_k)\) dans l'équation peut être interprétée comme la probabilité d'observer l'étiquette \(C_k\). Les probabilités a priori correspondent aux proportions de classes dans l'échantillon \(\left(\frac{\text{nombre d'échantillons dans la classe}}{\text{nombre total d'échantillons}}\right)\). Les probabilités a priori peuvent également être renvoyé en utilisant le paramètre \texttt{prior} de notre classe \texttt{Gaussian\_Naive\_Bayes}. Enfin, les paramètres \(\mu\) et \(\sigma\) sont estimés pour chaque classe et chaque prédicteur sur la base de l'échantillon d'entrainement. En sorti, la fonction \texttt{fit} stocke les résultats dans les membres privés de la classe.
+\vspace{0.1\baselineskip}
+
+
+\begin{algorithm}
+    \caption{Fonction \texttt{fit}}
+
+    \SetKwFunction{Fit}{fit}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\Fit{X, y}}{
+        \If{\Call{is.null}{X} \textbf{or} \Call{is.null}{y}}{
+            \Call{stop}{"X and y are required."}\;
+        }
+        
+        \If{\neg\Call{is.factor}{y} \textbf{and} \neg\Call{is.character}{y} \textbf{and} \neg\Call{is.logical}{y}}{
+            \Call{stop}{"y must be a factor, character, or logical vector."}\;
+        }
+        
+        \If{\neg\Call{is.data.frame}{X} \textbf{and} \neg\Call{is.matrix}{X}}{
+            \Call{stop}{"X must be a data frame or matrix."}\;
+        }
+
+        \If{\Call{any}{\Call{is.na}{X}} \textbf{or} \Call{any}{\Call{is.na}{y}}}{
+            \Call{stop}{"X and y cannot contain NA values."}\;
+        }
+
+        \texttt{self\$X} $\leftarrow$ X\;
+        \texttt{self\$y} $\leftarrow$ y\;
+
+        \If{\neg\Call{is.factor}{y}}{
+            \texttt{self\$y} $\leftarrow$ \Call{factor}{y}\;
+        }
+
+        \texttt{levels\_y} $\leftarrow$ \Call{levels}{self\$y}\;
+        
+        \If{\Call{nlevels}{self\$y} < 2}{
+            \Call{stop}{"y must contain at least two classes."}\;
+        }
+
+        \texttt{prior} $\leftarrow$ \Call{prop.table}{\Call{table}{self\$y}}\;
+        \texttt{lev} $\leftarrow$ \Call{levels}{self\$y}\;
+
+        \texttt{self\$X} $\leftarrow$ \Call{lapply}{X, private\$binarize}\;
+        \texttt{self\$X} $\leftarrow$ \Call{cbind}{\Call{as.data.frame}{self\$X}}\;
+        \texttt{self\$X} $\leftarrow$ \Call{private\$check\_numeric}{self\$X}\;
+
+        \texttt{vars} $\leftarrow$ \Call{colnames}{self\$X}\;
+
+        \texttt{params} $\leftarrow$ \Call{lapply}{lev, \textbf{function}(lev) \{
+            \texttt{lev\_subset} $\leftarrow$ \texttt{self\$X[self\$y == lev, , drop = FALSE]}\;
+            \texttt{mu} $\leftarrow$ \Call{colMeans}{lev\_subset, \textit{na.rm = TRUE}}\;
+            \texttt{sd} $\leftarrow$ \Call{apply}{lev\_subset, 2, \textbf{function}(x) \{
+                \texttt{sqrt}(\Call{mean}{x^2, \textit{na.rm = TRUE}} - \Call{mean}{x, \textit{na.rm = TRUE}}^2)\;
+            \}\;
+            \texttt{list(mu = mu, sd = sd)}\;
+        \}}\;
+
+        \texttt{self\$vars} $\leftarrow$ vars\;
+        \texttt{private\$data} $\leftarrow$ \texttt{list(x = self\$X, y = self\$y)}\;
+        \texttt{self\$levels\_y} $\leftarrow$ levels\_y\;
+        \texttt{self\$params} $\leftarrow$ params\;
+        \texttt{self\$prior} $\leftarrow$ prior\;
+        \texttt{private\$call} $\leftarrow$ \Call{match.call}{}\;
+    }
+}
+\end{algorithm}
+\newpage
+
+\subsubsection{Fonction \texttt{predict}} 
+La fonction \texttt{predict} prend en entrée un ensemble de données \texttt{Xtest} et retourne en sorti les prédictions sous forme de facteur, où chaque observation est attribuée à la classe avec la probabilité postérieure maximale. 
+Cette fonction récupère les paramètres du modèle entraîné tels que les niveaux de classe (\texttt{lev}), les probabilités a priori (\texttt{prior}), les moyennes (\(\mu\) et les écarts-types\(\sigma\)). Les prédicteurs étant des variables numériques, la distribution gaussienne est assumée et le calcul du likelihood s'est basé sur cette formule: 
+
+\[
+\mathbb{P}\left(X_i=v \mid Y=C_k\right)=\frac{1}{\sqrt{2 \pi \sigma_{i k}^2}} \exp \left(-\frac{\left(v-\mu_{i k}\right)^2}{2 \sigma_{i k}^2}\right)
+\]
+
+Enfin, la classe ayant la probabilité log-postérieure la plus élevée est choisie comme prédiction, selon la formule(1).
+
+\vspace{0.2\baselineskip}
+
+\begin{algorithm}
+    \caption{Fonction \texttt{predict}}
+    
+    \SetKwFunction{Predict}{predict}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\Predict{X\_test, threshold = 0.001, eps = 0}}{
+        \texttt{lev} $\leftarrow$ \texttt{self\$levels\_y}\;
+        \texttt{prior} $\leftarrow$ \texttt{self\$prior}\;
+        \texttt{mu} $\leftarrow$ \texttt{self\$params\$mu}\;
+        \texttt{sd} $\leftarrow$ \texttt{self\$params\$sd}\;
+
+        \texttt{...} \Comment{Validation des données d'entrée}
+
+        \texttt{num\_cores} $\leftarrow$ \Call{detectCores}{}\;
+        \texttt{cl} $\leftarrow$ \Call{makeCluster}{\texttt{num\_cores}}\;
+        \texttt{X\_test} $\leftarrow$ \Call{parLapply}{\texttt{cl, X\_test, private\$binarize}}\;
+        \Call{stopCluster}{\texttt{cl}}\;
+
+        \texttt{...} \Comment{Prétraitement des données d'entrée}
+
+        \texttt{features} $\leftarrow$ \texttt{col\_names[col\_names \%in\% colnames(mu)]}\;
+
+        \texttt{...} \Comment{Validation des caractéristiques}
+
+        \texttt{sd[sd <= eps]} $\leftarrow$ \texttt{threshold}\;
+        \texttt{eps} $\leftarrow$ \texttt{ifelse(eps == 0, log(.Machine\$double.xmin), log(eps))}\;
+        \texttt{threshold} $\leftarrow$ \texttt{log(threshold)}\;
+
+        \texttt{...} \Comment{Calcul des probabilités a posteriori}
+
+        \texttt{post} $\leftarrow$ \Call{matrix}{\texttt{nrow = nrow($X_{\text{test}}$), ncol = \Call{length}{lev}}}\;
+        \Call{colnames}{\texttt{post}} $\leftarrow$ \texttt{lev}\;
+
+        \For{\texttt{ith\_class} \textbf{in} \texttt{seq\_along(lev)}} {
+        \texttt{ith\_class\_sd} $\leftarrow$ \texttt{sd[ith\_class, ]}\;
+
+        \texttt{ith\_post} $\leftarrow$ \texttt{-0.5 * log(2 * pi * ith\_class\_sd^2) - 0.5 * (($X_{\text{test}}$ - mu[ith\_class, ]) / ith\_class\_sd)^2}\;
+
+        \texttt{ith\_post[ith\_post <= eps]} $\leftarrow$ \texttt{threshold}\;
+
+        \texttt{post[, ith\_class]} $\leftarrow$ \texttt{(rowSums(ith\_post) + log(prior[ith\_class]))}\;
+        
+        \texttt{self\$post} $\leftarrow$ \texttt{post}\;
+        \texttt{cat}{"\n Exponentiel \n"}\;
+
+        \Return{\texttt{factor(lev[max.col(post, "first")], lev)}}\;
+    
+        }}\end{algorithm}
+\vspace{0.3\baselineskip}
+
+\subsubsection{Fonction \texttt{predict\_proba}}
+
+L'utilisateur peut appeler la fonction \texttt{predict\_proba} afin d'obtenir, pour chaque observation, les probabilités d'appartenance à chaque classe \(P(Y = C_k | X = \mathbf{x})\). Cette fonction prend en entrée l'échantillon \(X_{\text{test}}\) et renvoie en sortie les probabilités a posteriori pour chaque classe sous forme de matrice. Le calcul des probabilités a posteriori utilise la fonction exponentielle pour transformer les log-probabilités stockées dans \texttt{self\$post} en probabilités. Ensuite, elle normalise les probabilités en divisant par la somme de toutes les probabilités.
+\newpage
+\begin{algorithm}
+    \caption{Fonction \texttt{predict\_proba}}
+
+    \SetKwFunction{PredictProba}{predict\_proba}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\PredictProba{$X_{\text{test}}$}}{
+        \texttt{...} \Comment{Validation des données d'entrée}
+
+        \texttt{n\_obs} $\leftarrow$ \texttt{nrow($X_{\text{test}}$)}\;
+        \texttt{n\_lev} $\leftarrow$ \texttt{length(self\$levels\_y)}\;
+        \texttt{post} $\leftarrow$ \texttt{matrix(0, nrow = n\_obs, ncol = n\_lev)}\;
+
+        \If{\texttt{n\_obs == 1}}{
+            \texttt{post} $\leftarrow$ \texttt{t(apply(post, 2, function(x) 1 / sum(exp(post - x))))}\;
+            \texttt{colnames(post)} $\leftarrow$ \texttt{self\$levels\_y}\;
+            \Return{\texttt{post}}\;
+        }\Else{
+            \texttt{colnames(post)} $\leftarrow$ \texttt{self\$levels\_y}\;
+            \texttt{result} $\leftarrow$ \texttt{matrix(0, nrow = n\_obs, ncol = n\_lev)}\;
+
+            \For{\texttt{i in seq\_len(n\_obs)}}{
+                \texttt{probabilities} $\leftarrow$ \texttt{exp(self\$post[i,])}\;
+                \texttt{sum\_per\_row} $\leftarrow$ \texttt{sum(probabilities)}\;
+
+                \For{\texttt{j in seq\_along(self\$levels\_y)}}{
+                    \texttt{result[i, j]} $\leftarrow$ \texttt{probabilities[j] / sum\_per\_row}\;
+                }
+            }
+
+            \texttt{colnames(result)} $\leftarrow$ \texttt{self\$levels\_y}\;
+            \Return{\texttt{result}}\;
+        }
+    }
+\end{algorithm}
+\vspace{0.5\baselineskip}
+\subsubsection{Fonction \texttt{print}}
+L'utilisateur peut inspecter les paramètres du modèle en appelant la fonction \texttt{print} qui a pour objectif d'afficher les probabilités a priori pour chaque classe et les tables de probabilités conditionnelles associées à chaque variable. Cette fonction obtient les tables de probabilités conditionnelles en appelant la méthode \texttt{get\_gaussian\_tables}.
+
+\vspace{0.3\baselineskip}
+
+\begin{algorithm}
+    \caption{Fonction \texttt{print}}
+    
+    \SetKwFunction{Print}{print}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\Print{}}{
+        \texttt{cat("\nPrior probabilities: \n")}\;
+        \texttt{cat("----------------------------\n")}\;
+        \For{\texttt{lev in names(self\$prior)}}{
+            \texttt{cat(paste(" ", lev, ": ", self\$prior[[lev]], "\n"))}\;
+        }
+
+        \texttt{cat("\nConditional Probabilities:\n")}\;
+        \texttt{cat("----------------------------\n")}\;
+        \texttt{tables $\leftarrow$ private\$get\_gaussian\_tables()}\;
+        \For{\texttt{var in names(tables)}}{
+            \texttt{cat(paste("\n Variable:", var, "\n"))}\;
+            \texttt{print(tables[[var]])}\;
+        }
+    }
+\end{algorithm}
+
+\vspace{0.3\baselineskip} 
+\subsubsection{Fonction \texttt{summary}}
+La fonction \texttt{summary} fournit à l'utilisateur un résumé des principales informations du modèle, incluant :
+\begin{itemize}
+    \item Le nombre total d'observations dans l'ensemble de données.
+    \item Le nombre d'observations de chaque classe.
+    \item Les probabilités a priori de chaque classe.
+    \item Le nombre et les noms des descripteurs.
+    \item Les écarts types et les moyennes de chaque descripteur pour chaque classe.
+\end{itemize}
+
+\newpage
+
+\begin{algorithm}
+    \caption{Function \texttt{summary}}
+    
+    \SetKwFunction{Print}{summary}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\Print{}}{
+        \texttt{cat("Number of observations: ", length(self\$y), "\textbackslash n")} \\
+        \texttt{cat("Number of training observations in each class:\textbackslash n")} \\
+        \texttt{print(table(self\$y))} \\
+        \texttt{cat("Prior probabilities in y:\textbackslash n")} \\
+        \texttt{print(prop.table(table(self\$y)))} \\
+        \texttt{cat("Number of Features:", length(self\$vars), "\textbackslash n")} \\
+        \texttt{cat("Features:", self\$vars, "\textbackslash n")} \\
+        \texttt{cat("Standard deviation of each feature:\textbackslash n")} \\
+        \texttt{print(self\$params\$sd)} \\
+        \texttt{cat("Mean of each feature per class:\textbackslash n")} \\
+        \texttt{print(self\$params\$mu)}
+    \texttt{\}}
+    }
+\end{algorithm}
+\vspace{0.3\baselineskip}
+\subsubsection{Fonction \texttt{confusion\_matrix}} 
+L'utilisateur peut à présent évaluer les performances du modèle en appelant la fonction \texttt{confusion\_matrix}. Celle-ci prend en entrée deux vecteurs, \texttt{y\_test} et \texttt{y\_pred}, qui représentent respectivement les valeurs réelles des classes et les valeurs prédites par le modèle. Elle génère en sortie une matrice de confusion et montre le nombre de prédictions correctes et incorrectes pour chaque classe. L'utilisateur peut ainsi calculer les métriques d'évaluation qu'il souhaite.
+
+\vspace{0.3\baselineskip}
+\begin{algorithm}
+    \caption{Fonction \texttt{confusion\_matrix}}
+    
+    \SetKwFunction{ConfusionMatrix}{confusion\_matrix}
+    \SetKwProg{Fn}{Function}{:}{}
+
+    \Fn{\ConfusionMatrix{$y\_test$, $y\_pred$}}{
+        \If{\Call{is.null}{$y\_test$} \textbf{or} \Call{is.null}{$y\_pred$}}{
+            \Call{stop}{"predict.gaussian\_naive\_bayes(): y\_test and y\_pred are required."}\;
+        }
+        
+        \If{\neg\Call{is.factor}{$y\_test$} \textbf{and} \neg\Call{is.character}{$y\_test$} \textbf{and} \neg\Call{is.logical}{$y\_test$}}{
+            \Call{stop}{"y\_test must be either a factor, character, or logical vector"}\;
+        }
+        
+        \If{\neg\Call{is.factor}{$y\_pred$} \textbf{and} \neg\Call{is.character}{$y\_pred$} \textbf{and} \neg\Call{is.logical}{$y\_pred$}}{
+            \Call{stop}{"y\_pred must be either a factor, character, or logical vector"}\;
+        }
+        
+        \If{\Call{any}{\Call{is.na}{$y\_test$}} \textbf{or} \Call{any}{\Call{is.na}{$y\_pred$}}}{
+            \Call{stop}{"y\_test or y\_pred cannot contain NA values."}\;
+        }
+
+        \texttt{cols} $\leftarrow$ \Call{paste0}{\text{"pred-"}, NB\$levels\_y}\;
+        \texttt{conf\_mat} $\leftarrow$ \Call{array}{\text{dim = c(length(self\$levels\_y),length(self\$levels\_y))}, \text{dimnames = list(self\$levels\_y,cols)}}\;
+
+        \For{\text{clas in self\$levels\_y}}{
+            \For{\text{clas\_pred in cols}}{
+                \text{compt} $\leftarrow$ \Call{table}{$y\_pred[y\_test == clas]$}\;
+                \text{conf\_mat[clas,]} $\leftarrow$ \text{compt}\;
+            }
+        }
+
+        \Return{\text{conf\_mat}}\;
+    }
+\end{algorithm}
+\newpage
+\section{Stratégie de parallélisation des calculs}
+\vspace{0.2\baselineskip}
+
+Dans notre classe R6 Naive Bayes Gaussian, nous avons utilisé une méthode de parallélisation des calculs pour réduire le temps de calcul sur des données volumineuses. La parallélisation des calculs a été réalisée en utilisant le package \texttt{parallel} et la fonction \texttt{parLapply} en exemple dans la fonction \texttt{predict} :
+
+\begin{itemize}
+    \item \texttt{detectCores} détermine le nombre de cœurs disponibles sur la machine.
+    \item \texttt{makeCluster} crée un cluster de calcul parallèle avec le nombre de cœurs déterminé précédemment. Les tâches peuvent être réparties entre ces cœurs pour accélérer le traitement.
+    \item \texttt{parLapply} applique la fonction \texttt{private\$binarize} de manière parallèle à chaque élément de la liste \texttt{X\_test}. Chaque élément de la liste est traité indépendamment par un cœur différent.
+    \item \texttt{stopCluster(cl)} : Une fois que le traitement parallèle est terminé, la fonction \texttt{stopCluster} arrête le cluster parallèle.
+\end{itemize}
+
+\vspace{0.3\baselineskip}
+
+\begin{algorithm}
+
+\SetKwFunction{Predict}{predict}
+\SetKwProg{Fn}{Function}{:}{}
+
+\Fn{\Predict{X\_test, threshold = 0.001, eps = 0}}{
+    \texttt{num\_cores} $\leftarrow$ \texttt{detectCores()}\;
+    \texttt{cl} $\leftarrow$ \texttt{makeCluster(num\_cores)}\;
+    \texttt{X\_test} $\leftarrow$ \texttt{parLapply(cl, X\_test, private\$binarize)}\;
+    \texttt{stopCluster(cl)}\;
+}
+\end{algorithm}
+
+\section{Exemple d'utilisation}
+
+Voici un exemple d'utilisation de notre package \texttt{GaussianNaiveBayes} pour l'instancier, l'entraîner et effectuer des prédictions: 
+
+
+\begin{verbatim}
+# Installer le package GaussianNaiveBayes
+install.packages("devtools")
+library(devtools)
+devtools::install_github('Abdouragit/GaussianNaiveBayes')
+library(GaussianNaiveBayes)
+
+# Créer une instance de la classe Gaussian_Naive_Bayes
+NB = Gaussian_Naive_Bayes$new()
+
+# Entraîner le modèle
+NB$fit(Xtrain, ytrain)
+
+# Effectuer des prédictions
+predictions <- NB$predict(Xtest)
+
+# Afficher les prédictions
+print(predictions)
+
+# Obtenir les probabilités de prédiction
+NB$predict_proba(Xtest)
+
+# Afficher un résumé du modèle
+NB$print()
+
+# Afficher un résumé des informations du modèle
+NB$summary()
+
+# Générer une matrice de confusion
+NB$confusion_matrix(y_test = ytest, y_pred = NB$y)
+\end{verbatim}
+
+\newpage
+
+\section{Références}
+
+\begin{thebibliography}{9}
+
+\bibitem{NBpackage}
+  Package Naive Bayes sur CRAN,
+  \textit{The Comprehensive R Archive Network},
+  \url{https://cran.r-project.org/web/packages/naivebayes/index.html}.
+
+\bibitem{scikit-learn}
+  Documentation scikit-learn - Naive Bayes gaussien,
+  \textit{scikit-learn},
+  \url{https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.GaussianNB.html}.
+
+\end{thebibliography}
+
+\end{document}
