@@ -1,3 +1,6 @@
+library(devtools)
+devtools::install_github('Abdouragit/GaussianNaiveBayes_R')
+
 library(rsample)
 library(GaussianNaiveBayes)
 
