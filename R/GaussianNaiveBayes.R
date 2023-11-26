@@ -80,7 +80,7 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #' @field vars Variables in X.
                                   vars = NULL,
 
-                                  #' @field evels_y Classes in y.
+                                  #' @field levels_y Classes in y.
                                   levels_y = NULL,
 
                                   #' @title fit
@@ -89,6 +89,10 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #'
                                   #' @param X a dataframe containing your training data set.
                                   #' @param y a vector of type factor, character or logical containing.
+                                  #'
+                                  #' @examples
+                                                                    #' #NB <- Gaussian_Naive_Bayes$new()
+                                                                    #' #NB$fit(X_train, y_train)
                                   fit = function(X,y) {
                                     #check if data is empty
                                     if (is.null(X))
@@ -199,6 +203,9 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #'
                                   #' @return vector of character
                                   #'
+                                  #' @examples
+                                                                    #' #y_pred <- NB$predict(Xtest)
+                                                                    #' #print(y_pred)
                                   #'
                                   predict = function(X_test,threshold = 0.001, eps = 0) {
 
@@ -277,7 +284,10 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #'
                                   #' @param X_test Dataframe containing your test data
                                   #'
-                                  #'
+                                  #'  @examples
+                                                                    #'  #y_proba = NB$predict_proba(Xtest)
+                                                                    #'  #print(y_proba)
+                                                                    #'
                                   predict_proba = function(X_test) {
 
                                     #check if X_test is empty
@@ -332,6 +342,11 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #'
                                   #' @returns A matrix type object.
                                   #'
+                                  #'
+                                  #' @examples
+                                                                    #' #conf_mat = NB$confusion_matrix(ytest,y_pred)
+                                                                    #' #print(conf_mat)
+                                                                    #'
                                   confusion_matrix = function(y_test, y_pred){
 
                                     #check if data is empty
@@ -372,6 +387,9 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #'
                                   #' @description Displays information data.
                                   #'
+                                  #' @examples
+                                                                    #' #print(NB)
+                                  #'
 
                                   print = function () {
                                     cat("\nPrior probabilities: \n")
@@ -392,6 +410,10 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                   #' @title summary
                                   #'
                                   #' @description displays information about the model and data.
+                                  #'
+                                  #' @examples
+                                                                    #' #NB$summary()
+                                                                    #'
                                   #'
                                   summary = function(){
                                     cat(rep(" \n",2))

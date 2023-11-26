@@ -24,6 +24,46 @@ summary
 \details{
 Gaussian_Naive_Bayes Class object
 }
+\examples{
+
+## ------------------------------------------------
+## Method `Gaussian_Naive_Bayes$fit`
+## ------------------------------------------------
+
+#NB <- Gaussian_Naive_Bayes$new()
+#NB$fit(X_train, y_train)
+
+## ------------------------------------------------
+## Method `Gaussian_Naive_Bayes$predict`
+## ------------------------------------------------
+
+#y_pred <- NB$predict(Xtest)
+#print(y_pred)
+
+
+## ------------------------------------------------
+## Method `Gaussian_Naive_Bayes$confusion_matrix`
+## ------------------------------------------------
+
+#conf_mat = NB$confusion_matrix(ytest,y_pred)
+#print(conf_mat)
+
+
+## ------------------------------------------------
+## Method `Gaussian_Naive_Bayes$print`
+## ------------------------------------------------
+
+#print(NB)
+
+
+## ------------------------------------------------
+## Method `Gaussian_Naive_Bayes$summary`
+## ------------------------------------------------
+
+#NB$summary()
+
+
+}
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
 \describe{
@@ -39,14 +79,7 @@ Gaussian_Naive_Bayes Class object
 
 \item{\code{vars}}{Variables in X.}
 
-\item{\code{evels_y}}{Classes in y.}
-}
-\if{html}{\out{</div>}}
-}
-\section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{evels_y}}{Classes in y.}
+\item{\code{levels_y}}{Classes in y.}
 }
 \if{html}{\out{</div>}}
 }
@@ -80,6 +113,15 @@ Train the model.
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{#NB <- Gaussian_Naive_Bayes$new()
+#NB$fit(X_train, y_train)
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Gaussian_Naive_Bayes-predict"></a>}}
@@ -104,6 +146,16 @@ Use the model to predict test values
 \subsection{Returns}{
 vector of character
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{#y_pred <- NB$predict(Xtest)
+#print(y_pred)
+
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Gaussian_Naive_Bayes-predict_proba"></a>}}
@@ -117,7 +169,11 @@ Gives the post probabilities for each row of your test set.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{X_test}}{Dataframe containing your test data}
+\item{\code{X_test}}{Dataframe containing your test data
+
+@examples
+#y_proba = NB$predict_proba(Xtest)
+#print(y_proba)}
 }
 \if{html}{\out{</div>}}
 }
@@ -140,6 +196,16 @@ Creates a confusion matrix confronting the classed data to the real classes.
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{#conf_mat = NB$confusion_matrix(ytest,y_pred)
+#print(conf_mat)
+
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Gaussian_Naive_Bayes-print"></a>}}
@@ -150,6 +216,15 @@ Displays information data.
 \if{html}{\out{<div class="r">}}\preformatted{Gaussian_Naive_Bayes$print()}\if{html}{\out{</div>}}
 }
 
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{#print(NB)
+
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Gaussian_Naive_Bayes-summary"></a>}}
@@ -158,6 +233,16 @@ Displays information data.
 displays information about the model and data.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Gaussian_Naive_Bayes$summary()}\if{html}{\out{</div>}}
+}
+
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{#NB$summary()
+
+
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
