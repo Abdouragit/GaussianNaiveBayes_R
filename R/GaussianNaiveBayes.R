@@ -356,7 +356,7 @@ Gaussian_Naive_Bayes <- R6Class("Gaussian_Naive_Bayes",
                                       stop("y_pred cannot contain NA values.")
                                     }
 
-                                    cols = paste0('pred-', NB$levels_y)
+                                    cols = paste0('pred-', self$levels_y)
                                     conf_mat = array(dim = c(length(self$levels_y),length(self$levels_y)),dimnames = list(self$levels_y,cols))
 
                                     for (clas in self$levels_y) {
