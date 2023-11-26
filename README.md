@@ -307,7 +307,12 @@ import.packages("parallel")
 
 <h1 style="color:#008000;">R-Shiny interactive web application</h1>
 
-You can access to the R-Shiny application for interactive analysis in this Github. 
+You can access to the R-Shiny application for interactive analysis in:<br>
+
+[Click here to access the R-Shiny interactive app](https://gaussiannaivebayes.shinyapps.io/NaiveBayesClassifier/)
+(Warning: on this version, model training is not functional)
+
+Please go to the "App" folder on this github to find the functional Shiny App or [click on this link](https://github.com/Abdouragit/GaussianNaiveBayes/blob/main/App/GaussianNaiveBaye_shiny_app.R)
 
 <h1 style="color:#008000;">Authors</h1>
 
